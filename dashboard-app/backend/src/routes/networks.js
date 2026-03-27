@@ -163,38 +163,55 @@ router.get('/vc-debug', async (_req, res) => {
   const headers   = { 'Authorization': `Token ${API_TOKEN}`, 'Content-Type': 'application/json' };
 
   try {
-    // 1. Org inventory with ?vc=true — returns only VC member devices
+    // Step 1: Org inventory with ?vc=true
     const vcInvRes = await fetch(`${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory?vc=true&limit=1000&page=1`, { headers });
     const vcInv    = await vcInvRes.json();
 
-    // 2. Org inventory without filter — for comparison / context
-    const invRes  = await fetch(`${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`, { headers });
-    const inv     = await invRes.json();
-    const switches = (Array.isArray(inv) ? inv : []).filter((d) => d.type === 'switch');
+    const vcArr = Array.isArray(vcInv) ? vcInv : [];
+    // Physical members: have vc_mac AND mac !== vc_mac
+    const physicalMembers = vcArr.filter((d) => d.vc_mac && d.mac !== d.vc_mac);
+
+    // Group by vc_mac to find site_id and a device id per chassis
+    const chassisMap = {};
+    for (const d of physicalMembers) {
+      if (!chassisMap[d.vc_mac]) {
+        chassisMap[d.vc_mac] = { site_id: d.site_id, ids: [] };
+      }
+      if (d.id) chassisMap[d.vc_mac].ids.push(d.id);
+    }
+
+    // Step 2: Call /vc for the first device id of each chassis
+    const vcApiResults = {};
+    for (const [vcMac, info] of Object.entries(chassisMap)) {
+      if (!info.site_id || info.ids.length === 0) {
+        vcApiResults[vcMac] = { error: 'no site_id or device id available' };
+        continue;
+      }
+      const deviceId = info.ids[0];
+      const url = `${BASE_URL}/api/v1/sites/${info.site_id}/devices/${deviceId}/vc`;
+      const r   = await fetch(url, { headers });
+      const txt = await r.text();
+      let parsed;
+      try { parsed = JSON.parse(txt); } catch { parsed = txt; }
+      vcApiResults[vcMac] = { status: r.status, url, response: parsed };
+    }
 
     res.json({
-      vcInventoryCount: Array.isArray(vcInv) ? vcInv.length : vcInv,
-      vcInventorySample: (Array.isArray(vcInv) ? vcInv : []).slice(0, 5).map((d) => ({
-        name:    d.name,
-        mac:     d.mac,
-        type:    d.type,
-        model:   d.model,
-        site_id: d.site_id,
-        vc_mac:  d.vc_mac,
-        vc_role: d.vc_role,
-        vc_name: d.vc_name,
+      vcInventoryRawCount:  vcArr.length,
+      physicalMemberCount:  physicalMembers.length,
+      // Full raw first member so we can see every inventory field
+      firstMemberRaw:       physicalMembers[0] || null,
+      // Status-related fields from inventory for every member
+      inventoryStatusFields: physicalMembers.map((d) => ({
+        name:      d.name,
+        mac:       d.mac,
+        vc_role:   d.vc_role,
         connected: d.connected,
-        _keys:   Object.keys(d),
+        status:    d.status,
+        up:        d.up,
       })),
-      allInventorySwitchCount: switches.length,
-      allInventorySwitchSample: switches.slice(0, 3).map((d) => ({
-        name:    d.name,
-        mac:     d.mac,
-        type:    d.type,
-        model:   d.model,
-        site_id: d.site_id,
-        _keys:   Object.keys(d),
-      })),
+      // Raw /vc API response per chassis
+      vcApiResults,
     });
   } catch (err) {
     res.status(502).json({ error: err.message, stack: err.stack });
