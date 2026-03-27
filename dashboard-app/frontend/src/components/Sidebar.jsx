@@ -1,5 +1,5 @@
 const NAV_ITEMS = [
-  { label: 'Networks', icon: '🌐', href: '#' },
+  { label: 'Networks & Port Profiles', icon: '🌐', href: '#' },
 ];
 
 export default function Sidebar({ dark, onToggleDark }) {

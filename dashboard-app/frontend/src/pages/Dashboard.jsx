@@ -409,11 +409,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 max-w-3xl">
 
+      {/* Welcome banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
+        <p className="text-lg font-bold text-white tracking-tight">👋 Welcome back, Vishal!</p>
+        <p className="text-sm text-indigo-100 mt-0.5">What are you configuring today?</p>
+      </div>
+
       {/* Header with dropdown */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <p className="flex-1 text-sm text-gray-500 dark:text-gray-400">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+        <div className="flex-1" />
         <select
           value={view}
           onChange={(e) => { setView(e.target.value); setResult(null); setApiError(''); }}
