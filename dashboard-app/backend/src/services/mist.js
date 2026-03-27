@@ -308,7 +308,7 @@ async function assignPortProfilesToDownPorts(siteId, deviceId, deviceMac, count)
     return true;
   });
 
-  console.log(`[Mist] Down ports: ${downPorts.length}, Eligible: ${eligible.length}, Requested: ${count}`);
+  console.log(`[Mist] Down ports: ${downPorts.length}, Eligible: ${eligible.length}, Profiles available: ${appProfiles.length}, Requested: ${count}`);
 
   if (count > eligible.length) {
     throw new Error(
@@ -316,17 +316,24 @@ async function assignPortProfilesToDownPorts(siteId, deviceId, deviceMac, count)
     );
   }
 
+  if (count > appProfiles.length) {
+    throw new Error(
+      `Not enough unique port profiles — only ${appProfiles.length} PROFILE_XXX profile${appProfiles.length !== 1 ? 's' : ''} exist on this device, but ${count} unique assignments requested. Create more port profiles first.`
+    );
+  }
+
   // 5. Randomly shuffle eligible ports and pick `count` of them
   const shuffled = [...eligible].sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, count);
 
-  // 6. Assign a random PROFILE_XXX to each selected port
+  // 6. Assign a unique PROFILE_XXX to each selected port (shuffle profiles, assign one-to-one)
+  const shuffledProfiles = [...appProfiles].sort(() => Math.random() - 0.5);
   const newPortConfig = { ...existingPortConfig };
   const assigned = [];
-  for (const port of selected) {
-    const profile = appProfiles[Math.floor(Math.random() * appProfiles.length)];
-    newPortConfig[port.port_id] = { usage: profile };
-    assigned.push({ port_id: port.port_id, profile });
+  for (let i = 0; i < selected.length; i++) {
+    const profile = shuffledProfiles[i];
+    newPortConfig[selected[i].port_id] = { usage: profile };
+    assigned.push({ port_id: selected[i].port_id, profile });
   }
 
   // 7. PUT updated config

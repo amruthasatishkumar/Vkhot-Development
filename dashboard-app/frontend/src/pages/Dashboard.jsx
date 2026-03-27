@@ -248,7 +248,7 @@ function BulkPortProfileView() {
 
       {result && (
         <div className="space-y-4">
-          <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
+          <div className="bg-brand-50 dark:bg-indigo-900/30 border border-brand-500/20 dark:border-indigo-500/30 rounded-xl px-5 py-4 text-sm">
             <p className="font-semibold text-brand-700 dark:text-brand-400">Switch found ✓</p>
             <p className="text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-medium">Name:</span> {result.switch.name} &nbsp;·&nbsp;
@@ -450,7 +450,7 @@ export default function Dashboard() {
       {result && (
         <div className="space-y-4">
           {/* Switch info */}
-          <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
+          <div className="bg-brand-50 dark:bg-indigo-900/30 border border-brand-500/20 dark:border-indigo-500/30 rounded-xl px-5 py-4 text-sm">
             <p className="font-semibold text-brand-700 dark:text-brand-400">Switch found ✓</p>
             <p className="text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-medium">Name:</span> {result.switch.name} &nbsp;·&nbsp;
@@ -667,7 +667,7 @@ function BulkPortProfileAssignmentView() {
 
       {result && result.assigned.length > 0 && (
         <div className="space-y-4">
-          <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
+          <div className="bg-brand-50 dark:bg-indigo-900/30 border border-brand-500/20 dark:border-indigo-500/30 rounded-xl px-5 py-4 text-sm">
             <p className="font-semibold text-brand-700 dark:text-brand-400">Switch found ✓</p>
             <p className="text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-medium">Name:</span> {result.switch.name} &nbsp;·&nbsp;
