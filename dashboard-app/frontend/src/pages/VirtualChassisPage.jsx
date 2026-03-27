@@ -76,10 +76,8 @@ export default function VirtualChassisPage() {
               {/* VC header */}
               <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                    Virtual Chassis {i + 1}
-                  </p>
-                  <p className="text-sm font-mono text-gray-700 dark:text-gray-200 mt-0.5">VC MAC: {vc.vc_mac}</p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-gray-100">{vc.name}</p>
+                  <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">MAC: {vc.vc_mac}</p>
                 </div>
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
                   {vc.members.length} member{vc.members.length !== 1 ? 's' : ''}

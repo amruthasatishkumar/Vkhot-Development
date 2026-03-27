@@ -259,41 +259,69 @@ async function bouncePortsOnce(siteId, deviceId, portIds) {
 async function listVirtualChassis() {
   await validateToken();
 
-  const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
-  console.log(`[Mist] GET ${url}`);
-  const res = await fetch(url, { headers: mistHeaders() });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Mist inventory lookup failed (${res.status}): ${body}`);
+  // Step 1: Org inventory — find all sites that have switches
+  const invUrl = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
+  console.log(`[Mist] GET ${invUrl}`);
+  const invRes = await fetch(invUrl, { headers: mistHeaders() });
+  if (!invRes.ok) {
+    const body = await invRes.text();
+    throw new Error(`Mist inventory lookup failed (${invRes.status}): ${body}`);
   }
-  const devices = await res.json();
+  const inventory = await invRes.json();
 
-  // Mist sets vc_mac and/or vc_role on VC member entries
-  const vcMembers = devices.filter((d) => d.type === 'switch' && (d.vc_mac || d.vc_role));
-  if (vcMembers.length === 0) return [];
-
-  // Group by vc_mac — fallback to device mac if vc_mac absent
-  const groups = {};
-  for (const d of vcMembers) {
-    const key = d.vc_mac ? normaliseMac(d.vc_mac) : normaliseMac(d.mac);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push({
-      id:      d.id,
-      mac:     d.mac,
-      name:    d.name   || 'Unnamed',
-      model:   d.model  || 'Unknown',
-      vc_role: d.vc_role || 'unknown',
-      serial:  d.serial  || '',
-      site_id: d.site_id || '',
-      status:  d.connected ? 'connected' : 'disconnected',
-    });
+  // Build MAC → inventory entry map for enriching member data later
+  const invByMac = {};
+  for (const d of inventory) {
+    if (d.mac) invByMac[normaliseMac(d.mac)] = d;
   }
+
+  // Collect unique site_ids that have at least one switch
+  const siteIds = [...new Set(
+    inventory.filter((d) => d.type === 'switch' && d.site_id).map((d) => d.site_id)
+  )];
+  if (siteIds.length === 0) return [];
+
+  // Step 2: Fetch site devices for each site in parallel
+  // Site devices (not inventory) carry the full vc_members sub-array
+  const siteDevices = (await Promise.all(
+    siteIds.map(async (siteId) => {
+      const url = `${BASE_URL}/api/v1/sites/${siteId}/devices?type=switch`;
+      console.log(`[Mist] GET ${url}`);
+      const r = await fetch(url, { headers: mistHeaders() });
+      if (!r.ok) return [];
+      return r.json();
+    })
+  )).flat();
+
+  // Step 3: Keep only VC devices (non-empty vc_members array)
+  const vcDevices = siteDevices.filter(
+    (d) => Array.isArray(d.vc_members) && d.vc_members.length > 0
+  );
+  if (vcDevices.length === 0) return [];
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
-  return Object.entries(groups).map(([vc_mac, members]) => ({
-    vc_mac,
-    members: members.sort((a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)),
-  }));
+
+  return vcDevices.map((vc) => {
+    const members = vc.vc_members.map((m) => {
+      const inv = invByMac[normaliseMac(m.mac || '')] || {};
+      return {
+        mac:     m.mac      || '',
+        name:    inv.name   || vc.name || '—',
+        model:   inv.model  || m.model || vc.model || 'Unknown',
+        vc_role: m.vc_role  || 'unknown',
+        serial:  inv.serial || m.serial || '',
+        site_id: vc.site_id || '',
+        status:  inv.connected ? 'connected' : 'disconnected',
+      };
+    }).sort((a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3));
+
+    return {
+      vc_mac:  normaliseMac(vc.mac),
+      name:    vc.name || 'Unnamed VC',
+      site_id: vc.site_id || '',
+      members,
+    };
+  });
 }
 
 module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis };
