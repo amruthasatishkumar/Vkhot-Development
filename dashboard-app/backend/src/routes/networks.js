@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce } = require('../services/mist');
 
 const router = express.Router();
 
@@ -109,6 +109,39 @@ router.post('/remove', async (req, res) => {
   } catch (err) {
     const status = err.message.includes('not found') ? 404 : 502;
     res.status(status).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/bounce-discover — find all eligible down ports for bouncing
+router.post('/bounce-discover', async (req, res) => {
+  const { mac } = req.body;
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({ error: 'Invalid or missing MAC address.' });
+  }
+  try {
+    const device = await findSwitchByMac(mac.trim());
+    const { ports } = await getDownPortsForBounce(device.site_id, device.id, device.mac);
+    res.json({
+      switch: { id: device.id, site_id: device.site_id, name: device.name || 'Unnamed Switch', mac: device.mac },
+      ports,
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/bounce-once — bounce a specific list of ports once
+router.post('/bounce-once', async (req, res) => {
+  const { siteId, deviceId, portIds } = req.body;
+  if (!siteId || !deviceId || !Array.isArray(portIds) || portIds.length === 0) {
+    return res.status(400).json({ error: 'siteId, deviceId, and a non-empty portIds array are required.' });
+  }
+  try {
+    await bouncePortsOnce(siteId, deviceId, portIds);
+    res.json({ bounced: portIds.length, timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
   }
 });
 

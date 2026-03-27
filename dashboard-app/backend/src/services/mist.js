@@ -180,7 +180,78 @@ async function removeAppVlansFromDevice(siteId, deviceId) {
   return { removed: toRemove.length };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice };
+/**
+ * Get all eligible down ports for bouncing on a switch.
+ * Same filtering as assignPortProfilesToDownPorts:
+ *   - port is down (up === false)
+ *   - port_id does NOT start with "vcp"
+ *   - port does NOT have usage === 'uplink'
+ *   - port does NOT have any existing usage assignment
+ * Returns { switchInfo: { name, mac }, ports: [{ port_id }] }
+ */
+async function getDownPortsForBounce(siteId, deviceId, deviceMac) {
+  const normalizedMac = normaliseMac(deviceMac);
+  const statsUrl = `${BASE_URL}/api/v1/sites/${siteId}/stats/switch_ports/search?mac=${normalizedMac}&limit=200`;
+  console.log(`[Mist] GET ${statsUrl}`);
+  const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
+  if (!statsRes.ok) {
+    const body = await statsRes.text();
+    throw new Error(`Failed to fetch port stats (${statsRes.status}): ${body}`);
+  }
+  const statsData = await statsRes.json();
+  const portStats = statsData.results || [];
+
+  if (portStats.length === 0) {
+    return { ports: [] };
+  }
+
+  const deviceUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${deviceUrl}`);
+  const deviceRes = await fetch(deviceUrl, { headers: mistHeaders() });
+  if (!deviceRes.ok) {
+    const body = await deviceRes.text();
+    throw new Error(`Failed to fetch device config (${deviceRes.status}): ${body}`);
+  }
+  const deviceConfig = await deviceRes.json();
+  const existingPortConfig = deviceConfig.port_config || {};
+
+  const downPorts = portStats.filter((p) => p.up === false);
+  const eligible = downPorts.filter((p) => {
+    const id = p.port_id;
+    if (!id || id.toLowerCase().startsWith('vcp')) return false;
+    const existing = existingPortConfig[id];
+    if (existing && existing.usage === 'uplink') return false;
+    if (existing && existing.usage) return false;
+    return true;
+  });
+
+  return {
+    ports: eligible.map((p) => ({ port_id: p.port_id })),
+  };
+}
+
+/**
+ * Bounce (disable/re-enable) a list of ports on a switch via the Mist bounce_port API.
+ * portIds: string[] e.g. ['ge-0/0/0', 'ge-0/0/1']
+ */
+async function bouncePortsOnce(siteId, deviceId, portIds) {
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}/bounce_port`;
+  console.log(`[Mist] POST ${url} — bouncing ${portIds.length} ports`);
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ports: portIds }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Bounce port failed (${res.status}): ${body}`);
+  }
+  // Mist may return 200 with empty body or JSON
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce };
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
 

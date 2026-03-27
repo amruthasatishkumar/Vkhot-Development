@@ -1,8 +1,9 @@
 const NAV_ITEMS = [
-  { label: 'Networks & Port Profiles', icon: '🌐', href: '#' },
+  { label: 'Networks & Port Profiles', icon: '🌐', page: 'dashboard' },
+  { label: 'Bounce Port',              icon: '🔄', page: 'bounce-port' },
 ];
 
-export default function Sidebar({ dark, onToggleDark }) {
+export default function Sidebar({ dark, onToggleDark, activePage, onNavigate }) {
   return (
     <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo */}
@@ -14,20 +15,25 @@ export default function Sidebar({ dark, onToggleDark }) {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1">
-        {NAV_ITEMS.map(({ label, icon, href }) => (
-          <a
-            key={label}
-            href={href}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
-                       text-gray-600 dark:text-gray-300
-                       hover:bg-brand-50 dark:hover:bg-gray-800
-                       hover:text-brand-700 dark:hover:text-brand-400
-                       transition-colors"
-          >
-            <span className="text-base">{icon}</span>
-            {label}
-          </a>
-        ))}
+        {NAV_ITEMS.map(({ label, icon, page }) => {
+          const isActive = activePage === page;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onNavigate(page)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left
+                ${
+                  isActive
+                    ? 'bg-brand-50 dark:bg-gray-800 text-brand-700 dark:text-brand-400 font-semibold'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-brand-50 dark:hover:bg-gray-800 hover:text-brand-700 dark:hover:text-brand-400'
+                }`}
+            >
+              <span className="text-base">{icon}</span>
+              {label}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Dark mode toggle */}
