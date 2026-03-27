@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+
 const ROLE_BADGE = {
   master:   'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-700',
   backup:   'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700',
@@ -8,14 +9,17 @@ const ROLE_BADGE = {
 };
 
 export default function VirtualChassisPage() {
-  const [loading,  setLoading]  = useState(false);
-  const [apiError, setApiError] = useState('');
-  const [vcs,      setVcs]      = useState(null); // null = not yet fetched
+  const [loading,   setLoading]   = useState(false);
+  const [apiError,  setApiError]  = useState('');
+  const [vcs,       setVcs]       = useState(null);
+  const [debugData, setDebugData] = useState(null);
+  const [debugging, setDebugging] = useState(false);
 
   async function handleLoad() {
     setLoading(true);
     setApiError('');
     setVcs(null);
+    setDebugData(null);
     try {
       const res  = await fetch('/api/networks/virtual-chassis');
       const data = await res.json();
@@ -25,6 +29,20 @@ export default function VirtualChassisPage() {
       setApiError('Could not reach the backend. Make sure it is running.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDebug() {
+    setDebugging(true);
+    setDebugData(null);
+    try {
+      const res  = await fetch('/api/networks/vc-debug');
+      const data = await res.json();
+      setDebugData(data);
+    } catch {
+      setDebugData({ error: 'Could not reach the backend.' });
+    } finally {
+      setDebugging(false);
     }
   }
 
@@ -47,6 +65,11 @@ export default function VirtualChassisPage() {
           className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
           {loading ? 'Scanning…' : '🔍 Find Virtual Chassis Devices'}
         </button>
+        <button type="button" onClick={handleDebug} disabled={debugging}
+          className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg transition-colors">
+          {debugging ? 'Loading…' : '🛠 Debug Raw API'}
+        </button>
+      </div>
       </div>
 
       {/* Error */}
@@ -118,6 +141,14 @@ export default function VirtualChassisPage() {
               </table>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Debug output */}
+      {debugData && (
+        <div className="bg-gray-900 dark:bg-gray-950 rounded-2xl border border-gray-700 p-5 overflow-x-auto">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">🛠 Raw API Debug Output</p>
+          <pre className="text-xs text-green-400 whitespace-pre-wrap break-all">{JSON.stringify(debugData, null, 2)}</pre>
         </div>
       )}
 

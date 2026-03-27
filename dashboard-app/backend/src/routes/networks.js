@@ -155,6 +155,64 @@ router.get('/virtual-chassis', async (_req, res) => {
   }
 });
 
+// GET /api/networks/vc-debug — raw diagnostic data for VC troubleshooting
+router.get('/vc-debug', async (_req, res) => {
+  const BASE_URL  = (process.env.MIST_BASE_URL  || '').replace(/\/$/, '');
+  const API_TOKEN = process.env.MIST_API_TOKEN;
+  const ORG_ID    = process.env.MIST_ORG_ID;
+  const headers   = { 'Authorization': `Token ${API_TOKEN}`, 'Content-Type': 'application/json' };
+
+  try {
+    // 1. Org inventory — show first 5 switch entries with all their keys
+    const invRes  = await fetch(`${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`, { headers });
+    const inv     = await invRes.json();
+    const switches = inv.filter((d) => d.type === 'switch');
+    const siteIds  = [...new Set(switches.filter((d) => d.site_id).map((d) => d.site_id))];
+
+    // 2. For the first site found, fetch raw site devices
+    let siteDevicesSample = [];
+    let siteDevicesKeys   = [];
+    if (siteIds.length > 0) {
+      const sdRes = await fetch(`${BASE_URL}/api/v1/sites/${siteIds[0]}/devices?type=switch`, { headers });
+      const sd    = await sdRes.json();
+      siteDevicesSample = (Array.isArray(sd) ? sd : sd.results || []).slice(0, 3).map((d) => ({
+        name:       d.name,
+        mac:        d.mac,
+        type:       d.type,
+        model:      d.model,
+        vc_mac:     d.vc_mac,
+        vc_role:    d.vc_role,
+        vc_members: d.vc_members,
+        // Show all top-level keys so we can find the right field name
+        _keys: Object.keys(d),
+      }));
+      if (siteDevicesSample.length > 0) {
+        siteDevicesKeys = Object.keys((Array.isArray(sd) ? sd[0] : (sd.results || [])[0]) || {});
+      }
+    }
+
+    res.json({
+      inventorySwitchCount: switches.length,
+      siteIds,
+      inventorySwitchSample: switches.slice(0, 3).map((d) => ({
+        name:    d.name,
+        mac:     d.mac,
+        type:    d.type,
+        model:   d.model,
+        site_id: d.site_id,
+        vc_mac:  d.vc_mac,
+        vc_role: d.vc_role,
+        _keys:   Object.keys(d),
+      })),
+      firstSiteId: siteIds[0] || null,
+      siteDevicesSample,
+      siteDevicesTopLevelKeys: siteDevicesKeys,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message, stack: err.stack });
+  }
+});
+
 module.exports = router;
 
 // ── Port Profiles ─────────────────────────────────────────────────────────────
