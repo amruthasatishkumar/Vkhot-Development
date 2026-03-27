@@ -275,9 +275,15 @@ async function listVirtualChassis() {
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
 
-  // Only keep entries that belong to a Virtual Chassis (vc_mac must be present).
-  const vcMembers = inventory.filter((d) => d.vc_mac && d.vc_mac.trim() !== '');
-  console.log(`[Mist] VC members after vc_mac filter: ${vcMembers.length}`);
+  // Only keep PHYSICAL members of a Virtual Chassis:
+  //   - vc_mac must be present (belongs to a VC)
+  //   - mac must differ from vc_mac (entries where mac === vc_mac are the virtual
+  //     chassis logical device itself, not a real physical member)
+  const vcMembers = inventory.filter((d) => {
+    if (!d.vc_mac || !d.vc_mac.trim()) return false;
+    return normaliseMac(d.mac) !== normaliseMac(d.vc_mac);
+  });
+  console.log(`[Mist] Physical VC members after filter: ${vcMembers.length}`);
   if (!vcMembers.length) return [];
 
   // Group by vc_mac. Track the master device id so we can call the /vc stats endpoint.
@@ -312,13 +318,37 @@ async function listVirtualChassis() {
 
   // Enrich each VC with per-member live status.
   // Strategy:
-  //   1. Call GET /sites/{site_id}/devices/{master_id}/vc  — one call, all members
-  //   2. For any member still 'unknown', call GET /sites/{site_id}/stats/devices/{member.id}
+  //   1. If master_id unknown, resolve it via GET /sites/{site_id}/devices/{member.id}
+  //      for each member until we find the master role in the device config.
+  //   2. Call GET /sites/{site_id}/devices/{master_id}/vc  — one call, all members' status
+  //   3. For any member still 'unknown', call GET /sites/{site_id}/stats/devices/{member.id}
   await Promise.all([...vcMap.values()].map(async (vc) => {
-    // Pick the master device id; fall back to first member's id.
-    const masterId = vc.master_id || vc.members.find((m) => m.id)?.id;
+    let masterId = vc.master_id;
 
-    // --- Step 1: /vc endpoint (bulk status) ---
+    // If we didn't get master_id from inventory, try GET /sites/{site_id}/devices/{id}
+    // on each member until we confirm which one is master.
+    if (!masterId && vc.site_id) {
+      for (const m of vc.members) {
+        if (!m.id) continue;
+        try {
+          const devUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${m.id}`;
+          console.log(`[Mist] GET ${devUrl} (resolve master)`);
+          const devRes = await fetch(devUrl, { headers: mistHeaders() });
+          if (devRes.ok) {
+            const devData = await devRes.json();
+            // If this device IS the master (vc_role === 'master' or it has vc_members data)
+            if (devData.vc_role === 'master' || Array.isArray(devData.vc_members)) {
+              masterId = m.id;
+              break;
+            }
+          }
+        } catch (e) { /* try next */ }
+      }
+      // Final fallback: just use the first member id
+      if (!masterId) masterId = vc.members.find((m) => m.id)?.id;
+    }
+
+    // --- Step 2: /vc endpoint (bulk status for all members in one call) ---
     if (masterId && vc.site_id) {
       try {
         const vcUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${masterId}/vc`;
@@ -346,7 +376,7 @@ async function listVirtualChassis() {
       }
     }
 
-    // --- Step 2: fallback — per-member /stats/devices/{id} for any still 'unknown' ---
+    // --- Step 3: fallback — per-member /stats/devices/{id} for any still 'unknown' ---
     const unknownMembers = vc.members.filter((m) => m.status === 'unknown' && m.id && vc.site_id);
     if (unknownMembers.length) {
       await Promise.all(unknownMembers.map(async (member) => {
