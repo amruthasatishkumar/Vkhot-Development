@@ -191,7 +191,7 @@ router.post('/assign-profiles', async (req, res) => {
 
   try {
     const device = await findSwitchByMac(mac.trim());
-    const { assigned, skipped } = await assignPortProfilesToDownPorts(device.site_id, device.id, assignCount);
+    const { assigned, skipped } = await assignPortProfilesToDownPorts(device.site_id, device.id, device.mac, assignCount);
 
     res.json({
       switch:   { mac: device.mac, name: device.name || 'Unnamed Switch' },

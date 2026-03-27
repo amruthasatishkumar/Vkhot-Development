@@ -256,16 +256,23 @@ async function createPortProfilesOnDevice(siteId, deviceId, count, mode) {
  * Also skips uplink ports (port_config entry with usage === "uplink").
  * Throws "Insufficient Port IDs" if count > valid eligible pool.
  */
-async function assignPortProfilesToDownPorts(siteId, deviceId, count) {
-  // 1. Get live port stats to find down ports
-  const statsUrl = `${BASE_URL}/api/v1/sites/${siteId}/stats/devices/${deviceId}/ports`;
+async function assignPortProfilesToDownPorts(siteId, deviceId, deviceMac, count) {
+  // 1. Get live port stats using the switch_ports search endpoint.
+  //    Returns paginated { results: [{ port_id, up, ... }] }
+  const normalizedMac = normaliseMac(deviceMac);
+  const statsUrl = `${BASE_URL}/api/v1/sites/${siteId}/stats/switch_ports/search?mac=${normalizedMac}&limit=200`;
   console.log(`[Mist] GET ${statsUrl}`);
   const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
   if (!statsRes.ok) {
     const body = await statsRes.text();
     throw new Error(`Failed to fetch port stats (${statsRes.status}): ${body}`);
   }
-  const portStats = await statsRes.json();
+  const statsData = await statsRes.json();
+  const portStats = statsData.results || [];
+
+  if (portStats.length === 0) {
+    throw new Error('No port stats available for this device. The switch may be offline or not reporting stats.');
+  }
 
   // 2. Get current device config
   const deviceUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
