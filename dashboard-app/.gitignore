@@ -6,9 +6,12 @@ frontend/node_modules/
 # SQLite database file
 backend/data/
 
-# Environment files
+# Environment files - NEVER commit secrets
 .env
+.env.local
+.env.*.local
 backend/.env
+backend/.env.local
 
 # Build output
 frontend/dist/

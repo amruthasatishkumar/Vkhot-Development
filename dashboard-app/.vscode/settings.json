@@ -13,5 +13,6 @@
   "search.exclude": {
     "**/node_modules": true,
     "**/frontend/dist": true
-  }
+  },
+  "explorer.excludeGitIgnore": false
 }
