@@ -6,7 +6,7 @@ const { init } = require('./db/database');
 // Validate critical env vars at startup
 const requiredEnv = ['MIST_API_TOKEN', 'MIST_ORG_ID', 'MIST_SITE_ID'];
 for (const key of requiredEnv) {
-  if (!process.env[key] || process.env[key].startsWith('your_')) {
+  if (!process.env[key] || process.env[key].trim() === '') {
     console.warn(`[WARN] ${key} is not set in .env — Mist API features will not work.`);
   }
 }
