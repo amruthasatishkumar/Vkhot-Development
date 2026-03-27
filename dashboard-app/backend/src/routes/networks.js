@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice } = require('../services/mist');
 
 const router = express.Router();
 
@@ -162,6 +162,63 @@ router.post('/remove-profiles', async (req, res) => {
   try {
     const device         = await findSwitchByMac(mac.trim());
     const { removed }    = await removeAppPortProfilesFromDevice(device.site_id, device.id);
+
+    res.json({
+      switch:  { mac: device.mac, name: device.name || 'Unnamed Switch' },
+      removed,
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// ── Port Profile Assignment ───────────────────────────────────────────────────
+
+// POST /api/networks/assign-profiles
+// Body: { mac, count }
+router.post('/assign-profiles', async (req, res) => {
+  const { mac, count } = req.body;
+
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({ error: 'Invalid MAC address format.' });
+  }
+
+  const assignCount = parseInt(count);
+  if (!count || isNaN(assignCount) || assignCount < 1) {
+    return res.status(400).json({ error: 'count must be a positive number.' });
+  }
+
+  try {
+    const device = await findSwitchByMac(mac.trim());
+    const { assigned, skipped } = await assignPortProfilesToDownPorts(device.site_id, device.id, assignCount);
+
+    res.json({
+      switch:   { mac: device.mac, name: device.name || 'Unnamed Switch' },
+      assigned,
+      skipped,
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404
+                 : err.message.includes('Insufficient') ? 422
+                 : err.message.includes('No app-created port profiles') ? 422
+                 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/remove-assignments
+// Body: { mac }
+router.post('/remove-assignments', async (req, res) => {
+  const { mac } = req.body;
+
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({ error: 'Invalid MAC address format.' });
+  }
+
+  try {
+    const device      = await findSwitchByMac(mac.trim());
+    const { removed } = await removeAppPortAssignmentsFromDevice(device.site_id, device.id);
 
     res.json({
       switch:  { mac: device.mac, name: device.name || 'Unnamed Switch' },

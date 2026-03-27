@@ -180,7 +180,7 @@ async function removeAppVlansFromDevice(siteId, deviceId) {
   return { removed: toRemove.length };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice };
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
 
@@ -248,6 +248,131 @@ async function createPortProfilesOnDevice(siteId, deviceId, count, mode) {
   }
 
   return created;
+}
+
+/**
+ * Assign PROFILE_XXX port profiles to `count` valid down ports on a switch.
+ * Valid = down + not VCP (port_id doesn't start with "vcp") + not already assigned.
+ * Also skips uplink ports (port_config entry with usage === "uplink").
+ * Throws "Insufficient Port IDs" if count > valid eligible pool.
+ */
+async function assignPortProfilesToDownPorts(siteId, deviceId, count) {
+  // 1. Get live port stats to find down ports
+  const statsUrl = `${BASE_URL}/api/v1/sites/${siteId}/stats/devices/${deviceId}/ports`;
+  console.log(`[Mist] GET ${statsUrl}`);
+  const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
+  if (!statsRes.ok) {
+    const body = await statsRes.text();
+    throw new Error(`Failed to fetch port stats (${statsRes.status}): ${body}`);
+  }
+  const portStats = await statsRes.json();
+
+  // 2. Get current device config
+  const deviceUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${deviceUrl}`);
+  const deviceRes = await fetch(deviceUrl, { headers: mistHeaders() });
+  if (!deviceRes.ok) {
+    const body = await deviceRes.text();
+    throw new Error(`Failed to fetch device config (${deviceRes.status}): ${body}`);
+  }
+  const deviceConfig = await deviceRes.json();
+
+  // 3. Read PROFILE_XXX names from the device
+  const existingProfiles = deviceConfig.port_usages || {};
+  const appProfiles = Object.keys(existingProfiles).filter((k) => APP_PROFILE_PATTERN.test(k));
+  if (appProfiles.length === 0) {
+    throw new Error('No app-created port profiles found on this device. Create port profiles first.');
+  }
+
+  // 4. Build eligible port pool
+  //    - port is down (up === false)
+  //    - port_id does NOT start with "vcp" (Virtual Chassis Port)
+  //    - existing port_config entry for this port does NOT have usage === "uplink"
+  //    - port has NO existing usage set (unassigned)
+  const existingPortConfig = deviceConfig.port_config || {};
+  const downPorts = portStats.filter((p) => p.up === false);
+
+  const eligible = downPorts.filter((p) => {
+    const id = p.port_id;
+    if (!id || id.toLowerCase().startsWith('vcp')) return false; // skip VCP
+    const existing = existingPortConfig[id];
+    if (existing && existing.usage === 'uplink') return false;   // skip uplink
+    if (existing && existing.usage) return false;                // skip already assigned
+    return true;
+  });
+
+  console.log(`[Mist] Down ports: ${downPorts.length}, Eligible: ${eligible.length}, Requested: ${count}`);
+
+  if (count > eligible.length) {
+    throw new Error(
+      `Insufficient Port IDs on this model — only ${eligible.length} valid down port${eligible.length !== 1 ? 's' : ''} available, but ${count} requested.`
+    );
+  }
+
+  // 5. Randomly shuffle eligible ports and pick `count` of them
+  const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, count);
+
+  // 6. Assign a random PROFILE_XXX to each selected port
+  const newPortConfig = { ...existingPortConfig };
+  const assigned = [];
+  for (const port of selected) {
+    const profile = appProfiles[Math.floor(Math.random() * appProfiles.length)];
+    newPortConfig[port.port_id] = { usage: profile };
+    assigned.push({ port_id: port.port_id, profile });
+  }
+
+  // 7. PUT updated config
+  console.log(`[Mist] PUT ${deviceUrl} — assigning profiles to ${assigned.length} ports`);
+  const putRes = await fetch(deviceUrl, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, port_config: newPortConfig }),
+  });
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device port_config (${putRes.status}): ${body}`);
+  }
+
+  const skipped = downPorts.length - eligible.length;
+  return { assigned, skipped };
+}
+
+/**
+ * Remove all app-created port profile assignments from port_config.
+ * Clears any port_config entry whose usage matches /^PROFILE_\d+$/.
+ */
+async function removeAppPortAssignmentsFromDevice(siteId, deviceId) {
+  const deviceUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  const getRes = await fetch(deviceUrl, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Failed to fetch device config (${getRes.status}): ${body}`);
+  }
+  const deviceConfig = await getRes.json();
+
+  const existingPortConfig = deviceConfig.port_config || {};
+  const toRemove = Object.keys(existingPortConfig).filter(
+    (k) => APP_PROFILE_PATTERN.test(existingPortConfig[k]?.usage || '')
+  );
+
+  if (toRemove.length === 0) return { removed: 0 };
+
+  const cleaned = { ...existingPortConfig };
+  for (const key of toRemove) delete cleaned[key];
+
+  console.log(`[Mist] Removing profile assignments from ${toRemove.length} ports on device ${deviceId}`);
+  const putRes = await fetch(deviceUrl, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, port_config: cleaned }),
+  });
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device (${putRes.status}): ${body}`);
+  }
+
+  return { removed: toRemove.length };
 }
 
 /**
