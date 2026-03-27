@@ -308,12 +308,16 @@ async function listVirtualChassis() {
     const role = (d.vc_role || 'unknown').toLowerCase();
     // master_id: match case-insensitively (Mist may return 'Master', 'master', 'RE0', etc.)
     if ((role === 'master' || role === 're0') && d.id) entry.master_id = d.id;
-    // Use inventory 'connected' as the baseline status — it is always present
-    const baseStatus = d.connected === true  ? 'connected'
-                     : d.connected === false ? 'disconnected'
-                     : 'unknown';
+    // Use inventory fields as baseline status.
+    // 'connected' can be boolean, 1/0, or string. 'status' may also be present directly.
+    let baseStatus = 'unknown';
+    if (d.status === 'connected' || d.status === 'online')          baseStatus = 'connected';
+    else if (d.status === 'disconnected' || d.status === 'offline') baseStatus = 'disconnected';
+    else if (d.connected === true  || d.connected === 1)            baseStatus = 'connected';
+    else if (d.connected === false || d.connected === 0)            baseStatus = 'disconnected';
+
     entry.members.push({
-      id:      d.id      || '',   // kept for stats enrichment
+      id:      d.id      || '',   // kept for per-member stats call
       mac:     d.mac    || '',
       name:    d.name   || '—',
       model:   d.model  || 'Unknown',
@@ -324,49 +328,29 @@ async function listVirtualChassis() {
     });
   }
 
-  // Enrich member status from GET /sites/{site_id}/stats/devices/{master_id}.
-  // The response contains a module_stat[] array — one entry per VC member —
-  // which is what the Mist dashboard uses to determine connected/disconnected.
-  await Promise.all([...vcMap.values()].map(async (vc) => {
-    const masterId = vc.master_id || vc.members.find((m) => m.id)?.id;
-    if (!masterId || !vc.site_id) return;
-
-    try {
-      const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${masterId}`;
-      console.log(`[Mist] GET ${statsUrl}`);
-      const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
-      if (!statsRes.ok) {
-        console.warn(`[Mist] stats/devices returned ${statsRes.status} for ${vc.vc_mac}`);
-        return;
+  // Enrich each member's status by calling /stats/devices/{id} per member.
+  // The top-level 'status' field on each device's stats is the most reliable source.
+  const siteId = [...vcMap.values()][0]?.site_id;
+  if (siteId) {
+    const allMembers = [...vcMap.values()].flatMap((vc) => vc.members);
+    await Promise.all(allMembers.map(async (member) => {
+      if (!member.id) return;
+      try {
+        const statsUrl = `${BASE_URL}/api/v1/sites/${member.site_id || siteId}/stats/devices/${member.id}`;
+        console.log(`[Mist] GET ${statsUrl}`);
+        const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
+        if (!statsRes.ok) return;
+        const s = await statsRes.json();
+        // Top-level status field is most reliable
+        if (s.status === 'connected' || s.status === 'online')          member.status = 'connected';
+        else if (s.status === 'disconnected' || s.status === 'offline') member.status = 'disconnected';
+        else if (s.up === true  || s.up === 1)                          member.status = 'connected';
+        else if (s.up === false || s.up === 0)                          member.status = 'disconnected';
+      } catch (e) {
+        console.warn(`[Mist] stats failed for member ${member.mac}: ${e.message}`);
       }
-      const statsData = await statsRes.json();
-
-      // module_stat is an array of per-member stats objects.
-      // Each entry has a mac field and a status (or up boolean).
-      const moduleStat = Array.isArray(statsData.module_stat) ? statsData.module_stat : [];
-      console.log(`[Mist] module_stat entries for ${vc.vc_mac}: ${moduleStat.length}`);
-
-      // Build mac → status lookup from module_stat
-      const liveStatus = {};
-      for (const m of moduleStat) {
-        const mac = m.mac || '';
-        if (!mac) continue;
-        // Accept explicit status string, or derive from up/connected boolean
-        const s = m.status
-          || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : null)
-          || (m.connected === false ? 'disconnected' : m.connected === true ? 'connected' : null);
-        if (s) liveStatus[normaliseMac(mac)] = s;
-      }
-
-      // Apply to members
-      for (const member of vc.members) {
-        const live = liveStatus[normaliseMac(member.mac)];
-        if (live) member.status = live;
-      }
-    } catch (e) {
-      console.warn(`[Mist] stats/devices failed for ${vc.vc_mac}: ${e.message}`);
-    }
-  }));
+    }));
+  }
 
   return [...vcMap.values()].map((vc) => ({
     vc_mac:  vc.vc_mac,
