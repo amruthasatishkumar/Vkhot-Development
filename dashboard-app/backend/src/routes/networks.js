@@ -6,6 +6,36 @@ const router = express.Router();
 // Accepts both AA:BB:CC:DD:EE:FF and AABBCCDDEEFF formats
 const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
+// GET /api/networks/debug — tests Mist connectivity and returns raw response info
+router.get('/debug', async (_req, res) => {
+  const BASE_URL  = (process.env.MIST_BASE_URL || '').replace(/\/$/, '');
+  const API_TOKEN = process.env.MIST_API_TOKEN;
+  const ORG_ID    = process.env.MIST_ORG_ID;
+
+  if (!API_TOKEN || API_TOKEN === 'your_mist_api_token_here') {
+    return res.status(500).json({ error: 'MIST_API_TOKEN not set' });
+  }
+  if (!ORG_ID || ORG_ID === 'your_org_id_here') {
+    return res.status(500).json({ error: 'MIST_ORG_ID not set' });
+  }
+
+  const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
+  try {
+    const mistRes = await fetch(url, {
+      headers: {
+        'Authorization': `Token ${API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const text = await mistRes.text();
+    let body;
+    try { body = JSON.parse(text); } catch { body = text; }
+    res.json({ url_called: url, http_status: mistRes.status, response: body });
+  } catch (err) {
+    res.status(500).json({ error: err.message, url_called: url });
+  }
+});
+
 // POST /api/networks/provision
 // Body: { mac: "AA:BB:CC:DD:EE:FF" }
 router.post('/provision', async (req, res) => {

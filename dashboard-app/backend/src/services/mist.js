@@ -22,7 +22,7 @@ function normaliseMac(mac) {
  * Returns { id, mac, site_id, name } or throws if not found.
  */
 async function findSwitchByMac(mac) {
-  const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory?type=switch`;
+  const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
   const res = await fetch(url, { headers: mistHeaders() });
 
   if (!res.ok) {
