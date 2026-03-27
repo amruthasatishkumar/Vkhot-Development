@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
@@ -157,7 +157,7 @@ function RemoveProfilesSection() {
 
 // ── Bulk Port Profile View ────────────────────────────────────────────────────
 
-function BulkPortProfileView() {
+function BulkPortProfileView({ onMacUsed }) {
   const [mac,          setMac]          = useState('');
   const [profileCount, setProfileCount] = useState('');
   const [mode,         setMode]         = useState('access');
@@ -192,7 +192,7 @@ function BulkPortProfileView() {
       });
       const data = await res.json();
       if (!res.ok) setApiError(data.error || 'An unexpected error occurred.');
-      else setResult(data);
+      else { setResult(data); onMacUsed?.(mac.trim()); }
     } catch {
       setApiError('Could not reach the backend. Make sure it is running.');
     } finally {
@@ -295,6 +295,40 @@ function BulkPortProfileView() {
   );
 }
 
+// ── Recent MACs Panel ──────────────────────────────────────────────────────
+
+function RecentMacsPanel({ macs, onRemove }) {
+  const [copied, setCopied] = useState(null);
+  if (macs.length === 0) return null;
+
+  function handleCopy(mac) {
+    navigator.clipboard?.writeText(mac).then(() => {
+      setCopied(mac);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+      <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Recent MACs Used</h3>
+      <div className="flex flex-wrap gap-2">
+        {macs.map((mac) => (
+          <div key={mac} className="flex items-center gap-1 pl-3 pr-1.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+            <button type="button" onClick={() => handleCopy(mac)} title="Click to copy MAC"
+              className="text-sm font-mono text-gray-700 dark:text-gray-200 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
+              {copied === mac ? '✓ Copied' : mac}
+            </button>
+            <button type="button" onClick={() => onRemove(mac)} title="Remove"
+              className="ml-1.5 text-gray-300 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors text-lg leading-none pb-px">
+              &times;
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [view,       setView]       = useState('bulk-networks');
   const [mac,        setMac]        = useState('');
@@ -304,6 +338,25 @@ export default function Dashboard() {
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState(null);
   const [apiError,   setApiError]   = useState('');
+  const [recentMacs, setRecentMacs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dashboard_recent_macs') || '[]'); }
+    catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_recent_macs', JSON.stringify(recentMacs));
+  }, [recentMacs]);
+
+  function addRecentMac(newMac) {
+    setRecentMacs((prev) => {
+      const filtered = prev.filter((m) => m.toLowerCase() !== newMac.toLowerCase());
+      return [newMac, ...filtered].slice(0, 10);
+    });
+  }
+
+  function removeRecentMac(mac) {
+    setRecentMacs((prev) => prev.filter((m) => m !== mac));
+  }
 
   function validateMac(value) {
     if (!value.trim()) return 'MAC address is required.';
@@ -344,6 +397,7 @@ export default function Dashboard() {
         setApiError(data.error || 'An unexpected error occurred.');
       } else {
         setResult(data);
+        addRecentMac(mac.trim());
       }
     } catch {
       setApiError('Could not reach the backend. Make sure it is running.');
@@ -378,10 +432,10 @@ export default function Dashboard() {
       </h1>
 
       {/* Bulk Port Profile */}
-      {view === 'bulk-port-profile' && <BulkPortProfileView />}
+      {view === 'bulk-port-profile' && <BulkPortProfileView onMacUsed={addRecentMac} />}
 
       {/* Bulk Port Profile Assignment */}
-      {view === 'bulk-port-assignment' && <BulkPortProfileAssignmentView />}
+      {view === 'bulk-port-assignment' && <BulkPortProfileAssignmentView onMacUsed={addRecentMac} />}
 
       {/* Bulk Networks */}
       {view === 'bulk-networks' && (<>
@@ -516,6 +570,13 @@ export default function Dashboard() {
 
       </>)}
 
+      {recentMacs.length > 0 && (
+        <>
+          <hr className="border-gray-200 dark:border-gray-700" />
+          <RecentMacsPanel macs={recentMacs} onRemove={removeRecentMac} />
+        </>
+      )}
+
     </div>
   );
 }
@@ -583,7 +644,7 @@ function RemoveAssignmentsSection() {
 
 // ── Bulk Port Profile Assignment View ──────────────────────────────────────────
 
-function BulkPortProfileAssignmentView() {
+function BulkPortProfileAssignmentView({ onMacUsed }) {
   const [mac,        setMac]        = useState('');
   const [count,      setCount]      = useState('');
   const [macError,   setMacError]   = useState('');
@@ -611,7 +672,7 @@ function BulkPortProfileAssignmentView() {
       });
       const data = await res.json();
       if (!res.ok) setApiError(data.error || 'An unexpected error occurred.');
-      else setResult(data);
+      else { setResult(data); onMacUsed?.(mac.trim()); }
     } catch {
       setApiError('Could not reach the backend. Make sure it is running.');
     } finally {
