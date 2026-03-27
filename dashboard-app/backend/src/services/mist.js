@@ -180,4 +180,107 @@ async function removeAppVlansFromDevice(siteId, deviceId) {
   return { removed: toRemove.length };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice };
+
+const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
+
+/**
+ * Create N port profiles on a switch using existing VLAN_XXX networks.
+ * Each profile randomly picks 2 distinct VLANs — one for port_network, one for voip_network.
+ */
+async function createPortProfilesOnDevice(siteId, deviceId, count, mode) {
+  const getUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${getUrl}`);
+  const getRes = await fetch(getUrl, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Failed to fetch device config (${getRes.status}): ${body}`);
+  }
+  const deviceConfig = await getRes.json();
+
+  // Find all VLAN_XXX networks already on the device
+  const existingNetworks = deviceConfig.networks || {};
+  const appVlans = Object.keys(existingNetworks).filter((k) => /^VLAN_\d+$/.test(k));
+
+  if (appVlans.length < 2) {
+    throw new Error(
+      `Not enough app-created networks on this device (found ${appVlans.length}). Create at least 2 VLANs first.`
+    );
+  }
+
+  // Generate unique profile IDs (3-digit numbers)
+  const profileIds = new Set();
+  while (profileIds.size < count) {
+    profileIds.add(Math.floor(Math.random() * 900) + 100); // 100–999
+  }
+
+  const existingProfiles = deviceConfig.port_usages || {};
+  const newProfiles = { ...existingProfiles };
+  const created = [];
+
+  for (const profileId of profileIds) {
+    // Pick 2 distinct random VLANs for port_network and voip_network
+    const shuffled = [...appVlans].sort(() => Math.random() - 0.5);
+    const portNetwork = shuffled[0];
+    const voipNetwork = shuffled[1];
+
+    const profileName = `PROFILE_${profileId}`;
+    newProfiles[profileName] = {
+      mode,
+      port_network: portNetwork,
+      voip_network: voipNetwork,
+      all_networks: false,
+    };
+
+    created.push({ name: profileName, mode, port_network: portNetwork, voip_network: voipNetwork });
+  }
+
+  console.log(`[Mist] PUT ${getUrl} with ${count} new port profiles`);
+  const putRes = await fetch(getUrl, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, port_usages: newProfiles }),
+  });
+
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device port profiles (${putRes.status}): ${body}`);
+  }
+
+  return created;
+}
+
+/**
+ * Remove all app-created port profiles (matching PROFILE_<number>) from a switch device.
+ */
+async function removeAppPortProfilesFromDevice(siteId, deviceId) {
+  const getUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  const getRes = await fetch(getUrl, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Failed to fetch device config (${getRes.status}): ${body}`);
+  }
+  const deviceConfig = await getRes.json();
+
+  const existingProfiles = deviceConfig.port_usages || {};
+  const toRemove = Object.keys(existingProfiles).filter((k) => APP_PROFILE_PATTERN.test(k));
+
+  if (toRemove.length === 0) return { removed: 0 };
+
+  const cleanedProfiles = { ...existingProfiles };
+  for (const key of toRemove) delete cleanedProfiles[key];
+
+  console.log(`[Mist] Removing ${toRemove.length} port profiles from device ${deviceId}`);
+  const putRes = await fetch(getUrl, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, port_usages: cleanedProfiles }),
+  });
+
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device (${putRes.status}): ${body}`);
+  }
+
+  return { removed: toRemove.length };
+}

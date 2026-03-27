@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice } = require('../services/mist');
 
 const router = express.Router();
 
@@ -113,3 +113,62 @@ router.post('/remove', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── Port Profiles ─────────────────────────────────────────────────────────────
+
+// POST /api/networks/port-profiles
+// Body: { mac, count, mode }
+router.post('/port-profiles', async (req, res) => {
+  const { mac, count, mode } = req.body;
+
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({ error: 'Invalid MAC address format.' });
+  }
+
+  const profileCount = parseInt(count);
+  if (!count || isNaN(profileCount) || profileCount < 1 || profileCount > 100) {
+    return res.status(400).json({ error: 'count must be a number between 1 and 100.' });
+  }
+
+  if (!mode || !['access', 'trunk'].includes(mode)) {
+    return res.status(400).json({ error: 'mode must be "access" or "trunk".' });
+  }
+
+  try {
+    const device  = await findSwitchByMac(mac.trim());
+    const created = await createPortProfilesOnDevice(device.site_id, device.id, profileCount, mode);
+
+    res.json({
+      switch:  { mac: device.mac, name: device.name || 'Unnamed Switch', site_id: device.site_id },
+      created,
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404
+                 : err.message.includes('Not enough') ? 422
+                 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/remove-profiles
+// Body: { mac }
+router.post('/remove-profiles', async (req, res) => {
+  const { mac } = req.body;
+
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({ error: 'Invalid MAC address format.' });
+  }
+
+  try {
+    const device         = await findSwitchByMac(mac.trim());
+    const { removed }    = await removeAppPortProfilesFromDevice(device.site_id, device.id);
+
+    res.json({
+      switch:  { mac: device.mac, name: device.name || 'Unnamed Switch' },
+      removed,
+    });
+  } catch (err) {
+    const status = err.message.includes('not found') ? 404 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
