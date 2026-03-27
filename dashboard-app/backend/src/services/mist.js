@@ -276,81 +276,103 @@ async function listVirtualChassis() {
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
 
-  // Only keep PHYSICAL members of a Virtual Chassis:
-  //   - vc_mac must be present (belongs to a VC)
-  //   - mac must differ from vc_mac (entries where mac === vc_mac are the virtual
-  //     chassis logical device itself, not a real physical member)
-  const vcMembers = inventory.filter((d) => {
-    if (!d.vc_mac || !d.vc_mac.trim()) return false;
-    return normaliseMac(d.mac) !== normaliseMac(d.vc_mac);
-  });
-  console.log(`[Mist] Physical VC members after filter: ${vcMembers.length}`);
-  if (!vcMembers.length) return [];
+  // Separate virtual chassis entries (mac === vc_mac) from physical members.
+  // The virtual chassis entry holds the device id needed for the /stats call.
+  const vcDeviceMap = {};   // vc_mac → { id, site_id, name } from the virtual chassis entry
+  const physicalMembers = [];
 
-  // Group by vc_mac. Track the master device id so we can call the /vc stats endpoint.
+  for (const d of inventory) {
+    if (!d.vc_mac || !d.vc_mac.trim()) continue;
+    if (normaliseMac(d.mac) === normaliseMac(d.vc_mac)) {
+      // This IS the virtual chassis logical device — save its id and site_id
+      vcDeviceMap[normaliseMac(d.vc_mac)] = {
+        id:      d.id      || '',
+        site_id: d.site_id || SITE_ID,
+        name:    d.name    || '',
+      };
+    } else {
+      // This is a real physical member
+      physicalMembers.push(d);
+    }
+  }
+
+  console.log(`[Mist] Physical VC members: ${physicalMembers.length}, VC device entries: ${Object.keys(vcDeviceMap).length}`);
+  if (!physicalMembers.length) return [];
+
+  // Group physical members by vc_mac
   const vcMap = new Map();
-  for (const d of vcMembers) {
+  for (const d of physicalMembers) {
     const chassisMac = normaliseMac(d.vc_mac);
     if (!chassisMac) continue;
     if (!vcMap.has(chassisMac)) {
+      const vcDev = vcDeviceMap[chassisMac] || {};
       vcMap.set(chassisMac, {
         vc_mac:    chassisMac,
-        name:      d.vc_name || d.name || 'Unnamed VC',
-        site_id:   d.site_id || SITE_ID,   // fallback to .env MIST_SITE_ID
-        master_id: null,
+        name:      d.vc_name || vcDev.name || d.name || 'Unnamed VC',
+        site_id:   vcDev.site_id || d.site_id || SITE_ID,
+        device_id: vcDev.id || '',   // ID of the VC logical device for /stats call
         members:   [],
       });
     }
     const entry = vcMap.get(chassisMac);
     if (d.vc_name && entry.name === 'Unnamed VC') entry.name = d.vc_name;
-    // Propagate site_id to chassis entry if we find it on any member
     if (d.site_id && !entry.site_id) entry.site_id = d.site_id;
-    const role = (d.vc_role || 'unknown').toLowerCase();
-    // master_id: match case-insensitively (Mist may return 'Master', 'master', 'RE0', etc.)
-    if ((role === 'master' || role === 're0') && d.id) entry.master_id = d.id;
-    // Use inventory fields as baseline status.
-    // 'connected' can be boolean, 1/0, or string. 'status' may also be present directly.
-    let baseStatus = 'unknown';
-    if (d.status === 'connected' || d.status === 'online')          baseStatus = 'connected';
-    else if (d.status === 'disconnected' || d.status === 'offline') baseStatus = 'disconnected';
-    else if (d.connected === true  || d.connected === 1)            baseStatus = 'connected';
-    else if (d.connected === false || d.connected === 0)            baseStatus = 'disconnected';
 
     entry.members.push({
-      id:      d.id      || '',   // kept for per-member stats call
       mac:     d.mac    || '',
       name:    d.name   || '—',
       model:   d.model  || 'Unknown',
-      vc_role: role,
+      vc_role: (d.vc_role || 'unknown').toLowerCase(),
       serial:  d.serial || '',
       site_id: d.site_id || SITE_ID,
-      status:  baseStatus,
+      status:  'unknown',   // enriched below from module_stat
     });
   }
 
-  // Enrich each member's status by calling /stats/devices/{id} per member.
-  // The top-level 'status' field on each device's stats is the most reliable source.
-  const siteId = [...vcMap.values()][0]?.site_id;
-  if (siteId) {
-    const allMembers = [...vcMap.values()].flatMap((vc) => vc.members);
-    await Promise.all(allMembers.map(async (member) => {
-      if (!member.id) return;
-      try {
-        const statsUrl = `${BASE_URL}/api/v1/sites/${member.site_id || siteId}/stats/devices/${member.id}`;
-        console.log(`[Mist] GET ${statsUrl}`);
-        const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
-        if (!statsRes.ok) return;
-        const s = await statsRes.json();
-        // Top-level status field is most reliable
-        if (s.status === 'connected' || s.status === 'online')          member.status = 'connected';
-        else if (s.status === 'disconnected' || s.status === 'offline') member.status = 'disconnected';
-        else if (s.up === true  || s.up === 1)                          member.status = 'connected';
-        else if (s.up === false || s.up === 0)                          member.status = 'disconnected';
-      } catch (e) {
-        console.warn(`[Mist] stats failed for member ${member.mac}: ${e.message}`);
+  // Enrich member status via GET /stats/devices/{device_id} on the VC logical device.
+  // The response has module_stat[] — one entry per physical member with mac + status.
+  await Promise.all([...vcMap.values()].map(async (vc) => {
+    if (!vc.device_id || !vc.site_id) {
+      console.warn(`[Mist] No device_id or site_id for VC ${vc.vc_mac} — status will be unknown`);
+      return;
+    }
+    try {
+      const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${vc.device_id}`;
+      console.log(`[Mist] GET ${statsUrl}`);
+      const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
+      if (!statsRes.ok) {
+        console.warn(`[Mist] stats/devices ${statsRes.status} for VC ${vc.vc_mac}`);
+        return;
       }
-    }));
-  }
+      const statsData = await statsRes.json();
+      const moduleStat = Array.isArray(statsData.module_stat) ? statsData.module_stat : [];
+      console.log(`[Mist] module_stat entries: ${moduleStat.length} for VC ${vc.vc_mac}`);
+
+      // Build mac → status lookup from module_stat
+      const liveStatus = {};
+      for (const m of moduleStat) {
+        const mac = m.mac || '';
+        if (!mac) continue;
+        let s = null;
+        if      (m.status === 'connected'    || m.status === 'online')  s = 'connected';
+        else if (m.status === 'disconnected' || m.status === 'offline') s = 'disconnected';
+        else if (m.up === true  || m.up === 1)                          s = 'connected';
+        else if (m.up === false || m.up === 0)                          s = 'disconnected';
+        if (s) liveStatus[normaliseMac(mac)] = s;
+      }
+
+      // Apply to members; fall back to VC-level status if module_stat is empty
+      const vcStatus = statsData.status === 'connected' || statsData.up === true ? 'connected'
+                     : statsData.status === 'disconnected' || statsData.up === false ? 'disconnected'
+                     : null;
+
+      for (const member of vc.members) {
+        member.status = liveStatus[normaliseMac(member.mac)] || vcStatus || 'unknown';
+      }
+    } catch (e) {
+      console.warn(`[Mist] stats/devices failed for VC ${vc.vc_mac}: ${e.message}`);
+    }
+  }));
 
   return [...vcMap.values()].map((vc) => ({
     vc_mac:  vc.vc_mac,
