@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice } = require('../services/mist');
 
 const router = express.Router();
 
@@ -79,7 +79,34 @@ router.post('/provision', async (req, res) => {
       failed: [],
     });
   } catch (err) {
-    // Switch not found or Mist API error
+    const status = err.message.includes('not found') ? 404 : 502;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/remove
+// Body: { mac: "AA:BB:CC:DD:EE:FF" }
+router.post('/remove', async (req, res) => {
+  const { mac } = req.body;
+
+  if (!mac || !MAC_REGEX.test(mac.trim())) {
+    return res.status(400).json({
+      error: 'Invalid MAC address format. Use AA:BB:CC:DD:EE:FF or AABBCCDDEEFF.',
+    });
+  }
+
+  try {
+    const device = await findSwitchByMac(mac.trim());
+    const { removed } = await removeAppVlansFromDevice(device.site_id, device.id);
+
+    res.json({
+      switch: {
+        mac:  device.mac,
+        name: device.name || 'Unnamed Switch',
+      },
+      removed,
+    });
+  } catch (err) {
     const status = err.message.includes('not found') ? 404 : 502;
     res.status(status).json({ error: err.message });
   }

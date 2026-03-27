@@ -2,6 +2,91 @@ import { useState } from 'react';
 
 const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
+function RemoveSection() {
+  const [mac,        setMac]        = useState('');
+  const [macError,   setMacError]   = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [result,     setResult]     = useState(null);
+  const [apiError,   setApiError]   = useState('');
+
+  async function handleRemove(e) {
+    e.preventDefault();
+    if (!mac.trim()) { setMacError('MAC address is required.'); return; }
+    if (!MAC_REGEX.test(mac.trim())) { setMacError('Invalid format. Use AA:BB:CC:DD:EE:FF or AABBCCDDEEFF.'); return; }
+
+    setMacError('');
+    setApiError('');
+    setResult(null);
+    setLoading(true);
+
+    try {
+      const res  = await fetch('/api/networks/remove', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ mac: mac.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) setApiError(data.error || 'An unexpected error occurred.');
+      else setResult(data);
+    } catch {
+      setApiError('Could not reach the backend. Make sure it is running.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
+      <h2 className="text-base font-semibold text-gray-800 mb-1">Remove App-Created VLANs</h2>
+      <p className="text-sm text-gray-500 mb-5">
+        Enter a switch MAC address to remove all <code className="bg-gray-100 px-1 rounded text-xs">VLAN_XXX</code> networks created by this app.
+      </p>
+
+      <form onSubmit={handleRemove} className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="e.g. AA:BB:CC:DD:EE:FF"
+            value={mac}
+            onChange={(e) => { setMac(e.target.value); setMacError(''); setResult(null); setApiError(''); }}
+            className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono
+              focus:outline-none focus:ring-2 focus:ring-red-400
+              ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+          />
+          {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50
+                     text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+        >
+          {loading ? 'Removing…' : 'Remove VLANs'}
+        </button>
+      </form>
+
+      {apiError && (
+        <div className="mt-4 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700">
+          <strong>Error:</strong> {apiError}
+        </div>
+      )}
+
+      {result && (
+        <div className={`mt-4 rounded-xl px-5 py-4 text-sm border
+          ${result.removed > 0
+            ? 'bg-green-50 border-green-200 text-green-700'
+            : 'bg-yellow-50 border-yellow-200 text-yellow-700'}`}
+        >
+          {result.removed > 0
+            ? <>✓ <strong>{result.removed} VLAN{result.removed !== 1 ? 's' : ''}</strong> removed from <strong>{result.switch.name}</strong> ({result.switch.mac})</>
+            : <>No app-created VLANs found on <strong>{result.switch.name}</strong> — nothing to remove.</>
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [mac,        setMac]        = useState('');
   const [vlanCount,  setVlanCount]  = useState('');
@@ -178,7 +263,7 @@ export default function Dashboard() {
           )}
 
           {/* Failed VLANs */}
-          {result.failed.length > 0 && (
+          {result.failed && result.failed.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
               <p className="font-semibold mb-2">Failed to create {result.failed.length} VLAN(s):</p>
               <ul className="list-disc list-inside space-y-1">
@@ -190,6 +275,13 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Divider */}
+      <hr className="border-gray-200" />
+
+      {/* Remove VLANs */}
+      <RemoveSection />
+
     </div>
   );
 }

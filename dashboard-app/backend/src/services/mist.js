@@ -139,4 +139,45 @@ async function createNetworksOnDevice(siteId, deviceId, vlans) {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice };
+const APP_VLAN_PATTERN = /^VLAN_\d+$/;
+
+/**
+ * Remove all app-created VLANs (matching VLAN_<number>) from a switch device.
+ * Returns { removed } count.
+ */
+async function removeAppVlansFromDevice(siteId, deviceId) {
+  const getUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${getUrl}`);
+  const getRes = await fetch(getUrl, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Failed to fetch device config (${getRes.status}): ${body}`);
+  }
+  const deviceConfig = await getRes.json();
+
+  const existingNetworks = deviceConfig.networks || {};
+  const toRemove = Object.keys(existingNetworks).filter((k) => APP_VLAN_PATTERN.test(k));
+
+  if (toRemove.length === 0) {
+    return { removed: 0 };
+  }
+
+  const cleanedNetworks = { ...existingNetworks };
+  for (const key of toRemove) delete cleanedNetworks[key];
+
+  console.log(`[Mist] Removing ${toRemove.length} VLANs from device ${deviceId}`);
+  const putRes = await fetch(`${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, networks: cleanedNetworks }),
+  });
+
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device (${putRes.status}): ${body}`);
+  }
+
+  return { removed: toRemove.length };
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice };
