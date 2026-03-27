@@ -361,13 +361,28 @@ async function listVirtualChassis() {
         if (s) liveStatus[normaliseMac(mac)] = s;
       }
 
-      // Apply to members; fall back to VC-level status if module_stat is empty
+      // VC-level status (used only when module_stat is completely absent)
       const vcStatus = statsData.status === 'connected' || statsData.up === true ? 'connected'
                      : statsData.status === 'disconnected' || statsData.up === false ? 'disconnected'
                      : null;
 
+      // Apply to members.
+      // If module_stat has entries: members present = connected/per-status,
+      // members ABSENT from module_stat = disconnected (Mist omits offline members).
+      // If module_stat is completely empty: fall back to VC-level status for all members.
+      const hasModuleStat = moduleStat.length > 0;
+
       for (const member of vc.members) {
-        member.status = liveStatus[normaliseMac(member.mac)] || vcStatus || 'unknown';
+        const live = liveStatus[normaliseMac(member.mac)];
+        if (live) {
+          member.status = live;
+        } else if (hasModuleStat) {
+          // Member not in module_stat → it's offline
+          member.status = 'disconnected';
+        } else {
+          // No module_stat at all → use VC-level status as best guess
+          member.status = vcStatus || 'unknown';
+        }
       }
     } catch (e) {
       console.warn(`[Mist] stats/devices failed for VC ${vc.vc_mac}: ${e.message}`);
