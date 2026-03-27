@@ -17,8 +17,10 @@ app.get('/health', (_req, res) => {
 // Initialise DB first, then mount routes and start listening
 init()
   .then(() => {
-    const apiRoutes = require('./routes/api');
+    const apiRoutes      = require('./routes/api');
+    const networkRoutes  = require('./routes/networks');
     app.use('/api', apiRoutes);
+    app.use('/api/networks', networkRoutes);
     app.listen(PORT, () => {
       console.log(`Backend running at http://localhost:${PORT}`);
     });
