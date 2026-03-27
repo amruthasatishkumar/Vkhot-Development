@@ -76,7 +76,7 @@ async function findSwitchByMac(mac) {
 function generateVlans(count = 5) {
   const ids = new Set();
   while (ids.size < count) {
-    ids.add(Math.floor(Math.random() * 900) + 100); // 100–999
+    ids.add(Math.floor(Math.random() * 4094) + 1); // 1–4094
   }
 
   return Array.from(ids).map((vlanId) => {

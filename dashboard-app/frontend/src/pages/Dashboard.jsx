@@ -4,7 +4,9 @@ const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
 export default function Dashboard() {
   const [mac,        setMac]        = useState('');
+  const [vlanCount,  setVlanCount]  = useState('');
   const [macError,   setMacError]   = useState('');
+  const [countError, setCountError] = useState('');
   const [loading,    setLoading]    = useState(false);
   const [result,     setResult]     = useState(null);
   const [apiError,   setApiError]   = useState('');
@@ -15,12 +17,24 @@ export default function Dashboard() {
     return '';
   }
 
+  function validateCount(value) {
+    const n = parseInt(value);
+    if (!value) return 'VLAN count is required.';
+    if (isNaN(n) || n < 1) return 'Must be at least 1.';
+    if (n > 4000) return 'Maximum 4000 VLANs per request.';
+    return '';
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    const err = validateMac(mac);
-    if (err) { setMacError(err); return; }
+    const macErr   = validateMac(mac);
+    const countErr = validateCount(vlanCount);
+    if (macErr)   setMacError(macErr);
+    if (countErr) setCountError(countErr);
+    if (macErr || countErr) return;
 
     setMacError('');
+    setCountError('');
     setApiError('');
     setResult(null);
     setLoading(true);
@@ -29,7 +43,7 @@ export default function Dashboard() {
       const res  = await fetch('/api/networks/provision', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ mac: mac.trim() }),
+        body:    JSON.stringify({ mac: mac.trim(), count: parseInt(vlanCount) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -59,27 +73,49 @@ export default function Dashboard() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="text-base font-semibold text-gray-800 mb-1">Provision VLANs on a Juniper Switch</h2>
         <p className="text-sm text-gray-500 mb-5">
-          Enter a switch MAC address to auto-generate 5 random VLANs on its Mist site.
+          Enter a switch MAC address and the number of VLANs to create on that device.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="e.g. AA:BB:CC:DD:EE:FF"
-              value={mac}
-              onChange={(e) => { setMac(e.target.value); setMacError(''); }}
-              className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono
-                focus:outline-none focus:ring-2 focus:ring-brand-500
-                ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-            />
-            {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* MAC Address */}
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Switch MAC Address</label>
+              <input
+                type="text"
+                placeholder="e.g. AA:BB:CC:DD:EE:FF"
+                value={mac}
+                onChange={(e) => { setMac(e.target.value); setMacError(''); }}
+                className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono
+                  focus:outline-none focus:ring-2 focus:ring-brand-500
+                  ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+              />
+              {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
+            </div>
+
+            {/* VLAN Count */}
+            <div className="w-full sm:w-40">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">VLAN Count (1–4000)</label>
+              <input
+                type="number"
+                min="1"
+                max="4000"
+                placeholder="e.g. 10"
+                value={vlanCount}
+                onChange={(e) => { setVlanCount(e.target.value); setCountError(''); }}
+                className={`w-full px-4 py-2.5 rounded-lg border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-brand-500
+                  ${countError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+              />
+              {countError && <p className="text-xs text-red-500 mt-1">{countError}</p>}
+            </div>
           </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50
-                       text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="w-full sm:w-auto px-6 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50
+                       text-white text-sm font-semibold rounded-lg transition-colors"
           >
             {loading ? 'Provisioning…' : 'Provision Networks'}
           </button>

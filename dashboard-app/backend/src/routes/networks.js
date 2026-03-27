@@ -37,14 +37,19 @@ router.get('/debug', async (_req, res) => {
 });
 
 // POST /api/networks/provision
-// Body: { mac: "AA:BB:CC:DD:EE:FF" }
+// Body: { mac: "AA:BB:CC:DD:EE:FF", count: 10 }
 router.post('/provision', async (req, res) => {
-  const { mac } = req.body;
+  const { mac, count } = req.body;
 
   if (!mac || !MAC_REGEX.test(mac.trim())) {
     return res.status(400).json({
       error: 'Invalid MAC address format. Use AA:BB:CC:DD:EE:FF or AABBCCDDEEFF.',
     });
+  }
+
+  const vlanCount = parseInt(count);
+  if (!count || isNaN(vlanCount) || vlanCount < 1 || vlanCount > 4000) {
+    return res.status(400).json({ error: 'count must be a number between 1 and 4000.' });
   }
 
   if (!process.env.MIST_API_TOKEN || process.env.MIST_API_TOKEN === 'your_mist_api_token_here') {
@@ -58,8 +63,8 @@ router.post('/provision', async (req, res) => {
     // 1. Find the switch in Mist inventory
     const device = await findSwitchByMac(mac.trim());
 
-    // 2. Generate 5 unique random VLANs
-    const vlans = generateVlans(5);
+    // 2. Generate VLANs based on user-supplied count
+    const vlans = generateVlans(vlanCount);
 
     // 3. Patch the VLANs directly onto the switch device config
     const created = await createNetworksOnDevice(device.site_id, device.id, vlans);
