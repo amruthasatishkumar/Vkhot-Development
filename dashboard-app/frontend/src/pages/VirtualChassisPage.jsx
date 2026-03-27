@@ -61,15 +61,16 @@ export default function VirtualChassisPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
           Scans your org inventory and lists all switches that are members of a Virtual Chassis.
         </p>
-        <button type="button" onClick={handleLoad} disabled={loading}
-          className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
-          {loading ? 'Scanning…' : '🔍 Find Virtual Chassis Devices'}
-        </button>
-        <button type="button" onClick={handleDebug} disabled={debugging}
-          className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg transition-colors">
-          {debugging ? 'Loading…' : '🛠 Debug Raw API'}
-        </button>
-      </div>
+        <div className="flex gap-3 flex-wrap">
+          <button type="button" onClick={handleLoad} disabled={loading}
+            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
+            {loading ? 'Scanning…' : '🔍 Find Virtual Chassis Devices'}
+          </button>
+          <button type="button" onClick={handleDebug} disabled={debugging}
+            className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-lg transition-colors">
+            {debugging ? 'Loading…' : '🛠 Debug Raw API'}
+          </button>
+        </div>
       </div>
 
       {/* Error */}
