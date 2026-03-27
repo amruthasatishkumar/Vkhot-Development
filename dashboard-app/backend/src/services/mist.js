@@ -271,49 +271,108 @@ async function listVirtualChassis() {
   const inventory = await invRes.json();
   console.log(`[Mist] VC inventory returned ${inventory.length} member entries`);
 
-  if (!inventory.length) return [];
+  if (!Array.isArray(inventory) || !inventory.length) return [];
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
 
   // Only keep entries that belong to a Virtual Chassis (vc_mac must be present).
-  const vcMembers = (Array.isArray(inventory) ? inventory : []).filter(
-    (d) => d.vc_mac && d.vc_mac.trim() !== ''
-  );
+  const vcMembers = inventory.filter((d) => d.vc_mac && d.vc_mac.trim() !== '');
   console.log(`[Mist] VC members after vc_mac filter: ${vcMembers.length}`);
   if (!vcMembers.length) return [];
 
-  // Group by vc_mac — the shared chassis identifier.
+  // Group by vc_mac. Track the master device id so we can call the /vc stats endpoint.
   const vcMap = new Map();
   for (const d of vcMembers) {
     const chassisMac = normaliseMac(d.vc_mac);
     if (!chassisMac) continue;
     if (!vcMap.has(chassisMac)) {
       vcMap.set(chassisMac, {
-        vc_mac:  chassisMac,
-        name:    d.vc_name || d.name || 'Unnamed VC',
-        site_id: d.site_id || '',
-        members: [],
+        vc_mac:    chassisMac,
+        name:      d.vc_name || d.name || 'Unnamed VC',
+        site_id:   d.site_id || '',
+        master_id: null,
+        members:   [],
       });
     }
-    // Use the vc_name for the chassis label; individual member name for the row
     const entry = vcMap.get(chassisMac);
     if (d.vc_name && entry.name === 'Unnamed VC') entry.name = d.vc_name;
+    const role = d.vc_role || 'unknown';
+    if (role === 'master' && d.id) entry.master_id = d.id;
     entry.members.push({
-      mac:     d.mac      || '',
-      name:    d.name     || '—',
-      model:   d.model    || 'Unknown',
-      vc_role: d.vc_role  || 'unknown',
-      serial:  d.serial   || '',
-      site_id: d.site_id  || '',
-      status:  d.connected ? 'connected' : 'disconnected',
+      id:      d.id      || '',   // kept for per-member stats fallback
+      mac:     d.mac    || '',
+      name:    d.name   || '—',
+      model:   d.model  || 'Unknown',
+      vc_role: role,
+      serial:  d.serial || '',
+      site_id: d.site_id || '',
+      status:  'unknown',   // enriched below
     });
   }
 
+  // Enrich each VC with per-member live status.
+  // Strategy:
+  //   1. Call GET /sites/{site_id}/devices/{master_id}/vc  — one call, all members
+  //   2. For any member still 'unknown', call GET /sites/{site_id}/stats/devices/{member.id}
+  await Promise.all([...vcMap.values()].map(async (vc) => {
+    // Pick the master device id; fall back to first member's id.
+    const masterId = vc.master_id || vc.members.find((m) => m.id)?.id;
+
+    // --- Step 1: /vc endpoint (bulk status) ---
+    if (masterId && vc.site_id) {
+      try {
+        const vcUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${masterId}/vc`;
+        console.log(`[Mist] GET ${vcUrl}`);
+        const vcRes = await fetch(vcUrl, { headers: mistHeaders() });
+        if (vcRes.ok) {
+          const vcData = await vcRes.json();
+          const statsArr = Array.isArray(vcData) ? vcData
+                         : Array.isArray(vcData.members) ? vcData.members
+                         : [];
+          const statusByMac = {};
+          for (const m of statsArr) {
+            if (m.mac) {
+              statusByMac[normaliseMac(m.mac)] =
+                m.status || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : undefined);
+            }
+          }
+          for (const member of vc.members) {
+            const s = statusByMac[normaliseMac(member.mac)];
+            if (s !== undefined) member.status = s;
+          }
+        }
+      } catch (e) {
+        console.warn(`[Mist] /vc status failed for ${vc.vc_mac}: ${e.message}`);
+      }
+    }
+
+    // --- Step 2: fallback — per-member /stats/devices/{id} for any still 'unknown' ---
+    const unknownMembers = vc.members.filter((m) => m.status === 'unknown' && m.id && vc.site_id);
+    if (unknownMembers.length) {
+      await Promise.all(unknownMembers.map(async (member) => {
+        try {
+          const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${member.id}`;
+          console.log(`[Mist] GET ${statsUrl}`);
+          const sRes = await fetch(statsUrl, { headers: mistHeaders() });
+          if (!sRes.ok) return;
+          const sData = await sRes.json();
+          // status field or derive from 'up' boolean
+          member.status = sData.status
+            || (sData.up === false ? 'disconnected' : sData.up === true ? 'connected' : 'unknown');
+        } catch (e) {
+          console.warn(`[Mist] /stats/devices failed for member ${member.mac}: ${e.message}`);
+        }
+      }));
+    }
+  }));
+
   return [...vcMap.values()].map((vc) => ({
-    ...vc,
+    vc_mac:  vc.vc_mac,
+    name:    vc.name,
+    site_id: vc.site_id,
     members: vc.members.sort(
       (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
-    ),
+    ).map(({ id: _id, ...rest }) => rest),   // strip internal id
   }));
 }
 
