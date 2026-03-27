@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetwork } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice } = require('../services/mist');
 
 const router = express.Router();
 
@@ -61,21 +61,8 @@ router.post('/provision', async (req, res) => {
     // 2. Generate 5 unique random VLANs
     const vlans = generateVlans(5);
 
-    // 3. Create all 5 networks in parallel
-    const results = await Promise.allSettled(
-      vlans.map((vlan) => createNetwork(device.site_id, vlan))
-    );
-
-    const created = [];
-    const failed  = [];
-
-    results.forEach((result, i) => {
-      if (result.status === 'fulfilled') {
-        created.push(result.value);
-      } else {
-        failed.push({ vlan: vlans[i].name, reason: result.reason?.message });
-      }
-    });
+    // 3. Patch the VLANs directly onto the switch device config
+    const created = await createNetworksOnDevice(device.site_id, device.id, vlans);
 
     res.json({
       switch: {
@@ -84,7 +71,7 @@ router.post('/provision', async (req, res) => {
         site_id: device.site_id,
       },
       created,
-      failed,
+      failed: [],
     });
   } catch (err) {
     // Switch not found or Mist API error

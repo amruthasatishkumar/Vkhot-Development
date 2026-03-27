@@ -1,6 +1,7 @@
-const BASE_URL = (process.env.MIST_BASE_URL || 'https://api.mist.com').replace(/\/$/, '');
-const API_TOKEN = process.env.MIST_API_TOKEN;
-const ORG_ID    = process.env.MIST_ORG_ID;
+// Trim whitespace and any accidental quotes from .env values
+const BASE_URL  = (process.env.MIST_BASE_URL  || 'https://api.mist.com').trim().replace(/['"]/g, '').replace(/\/$/, '');
+const API_TOKEN = (process.env.MIST_API_TOKEN || '').trim().replace(/['"]/g, '');
+const ORG_ID    = (process.env.MIST_ORG_ID    || '').trim().replace(/['"]/g, '');
 
 function mistHeaders() {
   return {
@@ -18,21 +19,46 @@ function normaliseMac(mac) {
 }
 
 /**
+ * Validate the API token works by calling /api/v1/self
+ */
+async function validateToken() {
+  const url = `${BASE_URL}/api/v1/self`;
+  const res = await fetch(url, { headers: mistHeaders() });
+  if (res.status === 401) throw new Error('MIST_API_TOKEN is invalid or expired (401 Unauthorized)');
+  if (res.status === 403) throw new Error('MIST_API_TOKEN does not have permission to access this org (403 Forbidden)');
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Mist token validation failed (${res.status}): ${body}`);
+  }
+}
+
+/**
  * Find a switch in the org inventory by its MAC address.
  * Returns { id, mac, site_id, name } or throws if not found.
  */
 async function findSwitchByMac(mac) {
+  // Validate token first — gives a clearer error than a 404 on inventory
+  await validateToken();
+
   const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
+  console.log(`[Mist] GET ${url}`);
+
   const res = await fetch(url, { headers: mistHeaders() });
 
   if (!res.ok) {
     const body = await res.text();
+    console.error(`[Mist] Inventory lookup failed: ${res.status}`, body);
+    if (res.status === 404) {
+      throw new Error(`Org not found — check MIST_ORG_ID is correct (got 404 for org: ${ORG_ID})`);
+    }
     throw new Error(`Mist inventory lookup failed (${res.status}): ${body}`);
   }
 
   const devices = await res.json();
-  const target   = normaliseMac(mac);
-  const found    = devices.find((d) => normaliseMac(d.mac || '') === target);
+  console.log(`[Mist] Inventory returned ${devices.length} device(s)`);
+
+  const target = normaliseMac(mac);
+  const found  = devices.find((d) => normaliseMac(d.mac || '') === target);
 
   if (!found) {
     throw new Error(`Switch with MAC ${mac} not found in org inventory`);
@@ -65,23 +91,52 @@ function generateVlans(count = 5) {
 }
 
 /**
- * Create a single network (VLAN) on a Mist site.
- * Returns the created network object from Mist.
+ * Create 5 VLANs directly on a specific switch device by patching its config.
+ * Fetches the current device config, merges new networks in, then PUTs it back.
  */
-async function createNetwork(siteId, vlan) {
-  const url = `${BASE_URL}/api/v1/sites/${siteId}/networks`;
-  const res = await fetch(url, {
-    method:  'POST',
-    headers: mistHeaders(),
-    body:    JSON.stringify(vlan),
-  });
+async function createNetworksOnDevice(siteId, deviceId, vlans) {
+  // 1. Get current device config
+  const getUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${getUrl}`);
+  const getRes = await fetch(getUrl, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const body = await getRes.text();
+    throw new Error(`Failed to fetch device config (${getRes.status}): ${body}`);
+  }
+  const deviceConfig = await getRes.json();
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Failed to create network ${vlan.name} (${res.status}): ${body}`);
+  // 2. Merge new VLANs into the device's networks map
+  const existingNetworks = deviceConfig.networks || {};
+  const newNetworks = { ...existingNetworks };
+  for (const vlan of vlans) {
+    newNetworks[vlan.name] = {
+      vlan_id: String(vlan.vlan_id),
+      subnet:  vlan.subnet,
+    };
   }
 
-  return res.json();
+  // 3. PUT updated config back to the device
+  const putUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] PUT ${putUrl} with ${vlans.length} new networks`);
+  const putRes = await fetch(putUrl, {
+    method:  'PUT',
+    headers: mistHeaders(),
+    body:    JSON.stringify({ ...deviceConfig, networks: newNetworks }),
+  });
+
+  if (!putRes.ok) {
+    const body = await putRes.text();
+    throw new Error(`Failed to update device networks (${putRes.status}): ${body}`);
+  }
+
+  const updated = await putRes.json();
+
+  // Return only the newly added VLANs for display
+  return vlans.map((v) => ({
+    vlan_id: v.vlan_id,
+    name:    v.name,
+    subnet:  v.subnet,
+  }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetwork };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice };
