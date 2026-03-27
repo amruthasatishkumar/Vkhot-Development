@@ -321,42 +321,47 @@ async function listVirtualChassis() {
     });
   }
 
-  // Optionally enrich status with live /vc endpoint data (best-effort — inventory
-  // 'connected' field is already set above as the reliable baseline).
+  // Enrich member status from GET /sites/{site_id}/stats/devices/{master_id}.
+  // The response contains a module_stat[] array — one entry per VC member —
+  // which is what the Mist dashboard uses to determine connected/disconnected.
   await Promise.all([...vcMap.values()].map(async (vc) => {
-    // Use master_id from inventory; fall back to first member with an id.
     const masterId = vc.master_id || vc.members.find((m) => m.id)?.id;
     if (!masterId || !vc.site_id) return;
 
     try {
-      const vcUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${masterId}/vc`;
-      console.log(`[Mist] GET ${vcUrl}`);
-      const vcRes = await fetch(vcUrl, { headers: mistHeaders() });
-      if (!vcRes.ok) return;
-      const vcData = await vcRes.json();
+      const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${masterId}`;
+      console.log(`[Mist] GET ${statsUrl}`);
+      const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
+      if (!statsRes.ok) {
+        console.warn(`[Mist] stats/devices returned ${statsRes.status} for ${vc.vc_mac}`);
+        return;
+      }
+      const statsData = await statsRes.json();
 
-      // Response may be an array or { members: [...] }
-      const statsArr = Array.isArray(vcData) ? vcData
-                     : Array.isArray(vcData.members) ? vcData.members
-                     : [];
+      // module_stat is an array of per-member stats objects.
+      // Each entry has a mac field and a status (or up boolean).
+      const moduleStat = Array.isArray(statsData.module_stat) ? statsData.module_stat : [];
+      console.log(`[Mist] module_stat entries for ${vc.vc_mac}: ${moduleStat.length}`);
 
-      // Build mac → live status map
+      // Build mac → status lookup from module_stat
       const liveStatus = {};
-      for (const m of statsArr) {
-        const mac = m.mac || m.vc_mac || '';
+      for (const m of moduleStat) {
+        const mac = m.mac || '';
         if (!mac) continue;
+        // Accept explicit status string, or derive from up/connected boolean
         const s = m.status
-          || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : null);
+          || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : null)
+          || (m.connected === false ? 'disconnected' : m.connected === true ? 'connected' : null);
         if (s) liveStatus[normaliseMac(mac)] = s;
       }
 
-      // Override baseline only when live data is available
+      // Apply to members
       for (const member of vc.members) {
         const live = liveStatus[normaliseMac(member.mac)];
         if (live) member.status = live;
       }
     } catch (e) {
-      console.warn(`[Mist] /vc live status failed for ${vc.vc_mac}: ${e.message}`);
+      console.warn(`[Mist] stats/devices failed for ${vc.vc_mac}: ${e.message}`);
     }
   }));
 

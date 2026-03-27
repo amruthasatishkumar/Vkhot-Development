@@ -180,28 +180,34 @@ router.get('/vc-debug', async (_req, res) => {
       if (d.id) chassisMap[d.vc_mac].ids.push(d.id);
     }
 
-    // Step 2: Call /vc for the first device id of each chassis
-    const vcApiResults = {};
+    // Step 2: Call /stats/devices for first member of each chassis — dump module_stat
+    const statsApiResults = {};
     for (const [vcMac, info] of Object.entries(chassisMap)) {
       if (!info.site_id || info.ids.length === 0) {
-        vcApiResults[vcMac] = { error: 'no site_id or device id available' };
+        statsApiResults[vcMac] = { error: 'no site_id or device id available' };
         continue;
       }
       const deviceId = info.ids[0];
-      const url = `${BASE_URL}/api/v1/sites/${info.site_id}/devices/${deviceId}/vc`;
+      const url = `${BASE_URL}/api/v1/sites/${info.site_id}/stats/devices/${deviceId}`;
       const r   = await fetch(url, { headers });
       const txt = await r.text();
       let parsed;
       try { parsed = JSON.parse(txt); } catch { parsed = txt; }
-      vcApiResults[vcMac] = { status: r.status, url, response: parsed };
+      // Only return module_stat + top-level status fields to keep output readable
+      const slim = parsed && typeof parsed === 'object' ? {
+        status:        parsed.status,
+        up:            parsed.up,
+        connected:     parsed.connected,
+        module_stat:   parsed.module_stat,
+        _topLevelKeys: Object.keys(parsed),
+      } : parsed;
+      statsApiResults[vcMac] = { httpStatus: r.status, url, data: slim };
     }
 
     res.json({
-      vcInventoryRawCount:  vcArr.length,
-      physicalMemberCount:  physicalMembers.length,
-      // Full raw first member so we can see every inventory field
-      firstMemberRaw:       physicalMembers[0] || null,
-      // Status-related fields from inventory for every member
+      vcInventoryRawCount:   vcArr.length,
+      physicalMemberCount:   physicalMembers.length,
+      firstMemberRaw:        physicalMembers[0] || null,
       inventoryStatusFields: physicalMembers.map((d) => ({
         name:      d.name,
         mac:       d.mac,
@@ -210,8 +216,8 @@ router.get('/vc-debug', async (_req, res) => {
         status:    d.status,
         up:        d.up,
       })),
-      // Raw /vc API response per chassis
-      vcApiResults,
+      // Raw /stats/devices response per chassis (shows module_stat array)
+      statsApiResults,
     });
   } catch (err) {
     res.status(502).json({ error: err.message, stack: err.stack });
