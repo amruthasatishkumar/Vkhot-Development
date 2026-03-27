@@ -259,69 +259,56 @@ async function bouncePortsOnce(siteId, deviceId, portIds) {
 async function listVirtualChassis() {
   await validateToken();
 
-  // Step 1: Org inventory — find all sites that have switches
-  const invUrl = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
+  // Use ?vc=true to get only VC member devices from org inventory.
+  // Each entry represents one VC member with vc_mac (shared chassis MAC) and vc_role.
+  const invUrl = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory?vc=true&limit=1000&page=1`;
   console.log(`[Mist] GET ${invUrl}`);
   const invRes = await fetch(invUrl, { headers: mistHeaders() });
   if (!invRes.ok) {
     const body = await invRes.text();
-    throw new Error(`Mist inventory lookup failed (${invRes.status}): ${body}`);
+    throw new Error(`Mist VC inventory lookup failed (${invRes.status}): ${body}`);
   }
   const inventory = await invRes.json();
+  console.log(`[Mist] VC inventory returned ${inventory.length} member entries`);
 
-  // Build MAC → inventory entry map for enriching member data later
-  const invByMac = {};
-  for (const d of inventory) {
-    if (d.mac) invByMac[normaliseMac(d.mac)] = d;
-  }
-
-  // Collect unique site_ids that have at least one switch
-  const siteIds = [...new Set(
-    inventory.filter((d) => d.type === 'switch' && d.site_id).map((d) => d.site_id)
-  )];
-  if (siteIds.length === 0) return [];
-
-  // Step 2: Fetch site devices for each site in parallel
-  // Site devices (not inventory) carry the full vc_members sub-array
-  const siteDevices = (await Promise.all(
-    siteIds.map(async (siteId) => {
-      const url = `${BASE_URL}/api/v1/sites/${siteId}/devices?type=switch`;
-      console.log(`[Mist] GET ${url}`);
-      const r = await fetch(url, { headers: mistHeaders() });
-      if (!r.ok) return [];
-      return r.json();
-    })
-  )).flat();
-
-  // Step 3: Keep only VC devices (non-empty vc_members array)
-  const vcDevices = siteDevices.filter(
-    (d) => Array.isArray(d.vc_members) && d.vc_members.length > 0
-  );
-  if (vcDevices.length === 0) return [];
+  if (!inventory.length) return [];
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
 
-  return vcDevices.map((vc) => {
-    const members = vc.vc_members.map((m) => {
-      const inv = invByMac[normaliseMac(m.mac || '')] || {};
-      return {
-        mac:     m.mac      || '',
-        name:    inv.name   || vc.name || '—',
-        model:   inv.model  || m.model || vc.model || 'Unknown',
-        vc_role: m.vc_role  || 'unknown',
-        serial:  inv.serial || m.serial || '',
-        site_id: vc.site_id || '',
-        status:  inv.connected ? 'connected' : 'disconnected',
-      };
-    }).sort((a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3));
+  // Group members by vc_mac (the shared Virtual Chassis identifier).
+  // Fall back to grouping by the device's own mac if vc_mac is absent.
+  const vcMap = new Map();
+  for (const d of inventory) {
+    const chassisMac = normaliseMac(d.vc_mac || d.mac || '');
+    if (!chassisMac) continue;
+    if (!vcMap.has(chassisMac)) {
+      vcMap.set(chassisMac, {
+        vc_mac:  chassisMac,
+        name:    d.vc_name || d.name || 'Unnamed VC',
+        site_id: d.site_id || '',
+        members: [],
+      });
+    }
+    // Use the vc_name for the chassis label; individual member name for the row
+    const entry = vcMap.get(chassisMac);
+    if (d.vc_name && entry.name === 'Unnamed VC') entry.name = d.vc_name;
+    entry.members.push({
+      mac:     d.mac      || '',
+      name:    d.name     || '—',
+      model:   d.model    || 'Unknown',
+      vc_role: d.vc_role  || 'unknown',
+      serial:  d.serial   || '',
+      site_id: d.site_id  || '',
+      status:  d.connected ? 'connected' : 'disconnected',
+    });
+  }
 
-    return {
-      vc_mac:  normaliseMac(vc.mac),
-      name:    vc.name || 'Unnamed VC',
-      site_id: vc.site_id || '',
-      members,
-    };
-  });
+  return [...vcMap.values()].map((vc) => ({
+    ...vc,
+    members: vc.members.sort(
+      (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
+    ),
+  }));
 }
 
 module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis };

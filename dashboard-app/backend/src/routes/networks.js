@@ -163,38 +163,18 @@ router.get('/vc-debug', async (_req, res) => {
   const headers   = { 'Authorization': `Token ${API_TOKEN}`, 'Content-Type': 'application/json' };
 
   try {
-    // 1. Org inventory — show first 5 switch entries with all their keys
+    // 1. Org inventory with ?vc=true — returns only VC member devices
+    const vcInvRes = await fetch(`${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory?vc=true&limit=1000&page=1`, { headers });
+    const vcInv    = await vcInvRes.json();
+
+    // 2. Org inventory without filter — for comparison / context
     const invRes  = await fetch(`${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`, { headers });
     const inv     = await invRes.json();
-    const switches = inv.filter((d) => d.type === 'switch');
-    const siteIds  = [...new Set(switches.filter((d) => d.site_id).map((d) => d.site_id))];
-
-    // 2. For the first site found, fetch raw site devices
-    let siteDevicesSample = [];
-    let siteDevicesKeys   = [];
-    if (siteIds.length > 0) {
-      const sdRes = await fetch(`${BASE_URL}/api/v1/sites/${siteIds[0]}/devices?type=switch`, { headers });
-      const sd    = await sdRes.json();
-      siteDevicesSample = (Array.isArray(sd) ? sd : sd.results || []).slice(0, 3).map((d) => ({
-        name:       d.name,
-        mac:        d.mac,
-        type:       d.type,
-        model:      d.model,
-        vc_mac:     d.vc_mac,
-        vc_role:    d.vc_role,
-        vc_members: d.vc_members,
-        // Show all top-level keys so we can find the right field name
-        _keys: Object.keys(d),
-      }));
-      if (siteDevicesSample.length > 0) {
-        siteDevicesKeys = Object.keys((Array.isArray(sd) ? sd[0] : (sd.results || [])[0]) || {});
-      }
-    }
+    const switches = (Array.isArray(inv) ? inv : []).filter((d) => d.type === 'switch');
 
     res.json({
-      inventorySwitchCount: switches.length,
-      siteIds,
-      inventorySwitchSample: switches.slice(0, 3).map((d) => ({
+      vcInventoryCount: Array.isArray(vcInv) ? vcInv.length : vcInv,
+      vcInventorySample: (Array.isArray(vcInv) ? vcInv : []).slice(0, 5).map((d) => ({
         name:    d.name,
         mac:     d.mac,
         type:    d.type,
@@ -202,11 +182,19 @@ router.get('/vc-debug', async (_req, res) => {
         site_id: d.site_id,
         vc_mac:  d.vc_mac,
         vc_role: d.vc_role,
+        vc_name: d.vc_name,
+        connected: d.connected,
         _keys:   Object.keys(d),
       })),
-      firstSiteId: siteIds[0] || null,
-      siteDevicesSample,
-      siteDevicesTopLevelKeys: siteDevicesKeys,
+      allInventorySwitchCount: switches.length,
+      allInventorySwitchSample: switches.slice(0, 3).map((d) => ({
+        name:    d.name,
+        mac:     d.mac,
+        type:    d.type,
+        model:   d.model,
+        site_id: d.site_id,
+        _keys:   Object.keys(d),
+      })),
     });
   } catch (err) {
     res.status(502).json({ error: err.message, stack: err.stack });
