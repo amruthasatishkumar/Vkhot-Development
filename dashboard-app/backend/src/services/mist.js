@@ -2,6 +2,7 @@
 const BASE_URL  = (process.env.MIST_BASE_URL  || 'https://api.mist.com').trim().replace(/['"]/g, '').replace(/\/$/, '');
 const API_TOKEN = (process.env.MIST_API_TOKEN || '').trim().replace(/['"]/g, '');
 const ORG_ID    = (process.env.MIST_ORG_ID    || '').trim().replace(/['"]/g, '');
+const SITE_ID   = (process.env.MIST_SITE_ID   || '').trim().replace(/['"]/g, '');
 
 function mistHeaders() {
   return {
@@ -295,13 +296,15 @@ async function listVirtualChassis() {
       vcMap.set(chassisMac, {
         vc_mac:    chassisMac,
         name:      d.vc_name || d.name || 'Unnamed VC',
-        site_id:   d.site_id || '',
+        site_id:   d.site_id || SITE_ID,   // fallback to .env MIST_SITE_ID
         master_id: null,
         members:   [],
       });
     }
     const entry = vcMap.get(chassisMac);
     if (d.vc_name && entry.name === 'Unnamed VC') entry.name = d.vc_name;
+    // Propagate site_id to chassis entry if we find it on any member
+    if (d.site_id && !entry.site_id) entry.site_id = d.site_id;
     const role = (d.vc_role || 'unknown').toLowerCase();
     // master_id: match case-insensitively (Mist may return 'Master', 'master', 'RE0', etc.)
     if ((role === 'master' || role === 're0') && d.id) entry.master_id = d.id;
@@ -310,13 +313,13 @@ async function listVirtualChassis() {
                      : d.connected === false ? 'disconnected'
                      : 'unknown';
     entry.members.push({
-      id:      d.id      || '',   // kept for /vc enrichment
+      id:      d.id      || '',   // kept for stats enrichment
       mac:     d.mac    || '',
       name:    d.name   || '—',
       model:   d.model  || 'Unknown',
       vc_role: role,
       serial:  d.serial || '',
-      site_id: d.site_id || '',
+      site_id: d.site_id || SITE_ID,
       status:  baseStatus,
     });
   }

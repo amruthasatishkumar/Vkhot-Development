@@ -171,12 +171,15 @@ router.get('/vc-debug', async (_req, res) => {
     // Physical members: have vc_mac AND mac !== vc_mac
     const physicalMembers = vcArr.filter((d) => d.vc_mac && d.mac !== d.vc_mac);
 
+    const SITE_ID_FALLBACK = (process.env.MIST_SITE_ID || '').trim();
     // Group by vc_mac to find site_id and a device id per chassis
     const chassisMap = {};
     for (const d of physicalMembers) {
       if (!chassisMap[d.vc_mac]) {
-        chassisMap[d.vc_mac] = { site_id: d.site_id, ids: [] };
+        chassisMap[d.vc_mac] = { site_id: d.site_id || SITE_ID_FALLBACK, ids: [] };
       }
+      // Propagate site_id if found on any member
+      if (d.site_id && !chassisMap[d.vc_mac].site_id) chassisMap[d.vc_mac].site_id = d.site_id;
       if (d.id) chassisMap[d.vc_mac].ids.push(d.id);
     }
 
