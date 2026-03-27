@@ -302,97 +302,61 @@ async function listVirtualChassis() {
     }
     const entry = vcMap.get(chassisMac);
     if (d.vc_name && entry.name === 'Unnamed VC') entry.name = d.vc_name;
-    const role = d.vc_role || 'unknown';
-    if (role === 'master' && d.id) entry.master_id = d.id;
+    const role = (d.vc_role || 'unknown').toLowerCase();
+    // master_id: match case-insensitively (Mist may return 'Master', 'master', 'RE0', etc.)
+    if ((role === 'master' || role === 're0') && d.id) entry.master_id = d.id;
+    // Use inventory 'connected' as the baseline status — it is always present
+    const baseStatus = d.connected === true  ? 'connected'
+                     : d.connected === false ? 'disconnected'
+                     : 'unknown';
     entry.members.push({
-      id:      d.id      || '',   // kept for per-member stats fallback
+      id:      d.id      || '',   // kept for /vc enrichment
       mac:     d.mac    || '',
       name:    d.name   || '—',
       model:   d.model  || 'Unknown',
       vc_role: role,
       serial:  d.serial || '',
       site_id: d.site_id || '',
-      status:  'unknown',   // enriched below
+      status:  baseStatus,
     });
   }
 
-  // Enrich each VC with per-member live status.
-  // Strategy:
-  //   1. If master_id unknown, resolve it via GET /sites/{site_id}/devices/{member.id}
-  //      for each member until we find the master role in the device config.
-  //   2. Call GET /sites/{site_id}/devices/{master_id}/vc  — one call, all members' status
-  //   3. For any member still 'unknown', call GET /sites/{site_id}/stats/devices/{member.id}
+  // Optionally enrich status with live /vc endpoint data (best-effort — inventory
+  // 'connected' field is already set above as the reliable baseline).
   await Promise.all([...vcMap.values()].map(async (vc) => {
-    let masterId = vc.master_id;
+    // Use master_id from inventory; fall back to first member with an id.
+    const masterId = vc.master_id || vc.members.find((m) => m.id)?.id;
+    if (!masterId || !vc.site_id) return;
 
-    // If we didn't get master_id from inventory, try GET /sites/{site_id}/devices/{id}
-    // on each member until we confirm which one is master.
-    if (!masterId && vc.site_id) {
-      for (const m of vc.members) {
-        if (!m.id) continue;
-        try {
-          const devUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${m.id}`;
-          console.log(`[Mist] GET ${devUrl} (resolve master)`);
-          const devRes = await fetch(devUrl, { headers: mistHeaders() });
-          if (devRes.ok) {
-            const devData = await devRes.json();
-            // If this device IS the master (vc_role === 'master' or it has vc_members data)
-            if (devData.vc_role === 'master' || Array.isArray(devData.vc_members)) {
-              masterId = m.id;
-              break;
-            }
-          }
-        } catch (e) { /* try next */ }
+    try {
+      const vcUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${masterId}/vc`;
+      console.log(`[Mist] GET ${vcUrl}`);
+      const vcRes = await fetch(vcUrl, { headers: mistHeaders() });
+      if (!vcRes.ok) return;
+      const vcData = await vcRes.json();
+
+      // Response may be an array or { members: [...] }
+      const statsArr = Array.isArray(vcData) ? vcData
+                     : Array.isArray(vcData.members) ? vcData.members
+                     : [];
+
+      // Build mac → live status map
+      const liveStatus = {};
+      for (const m of statsArr) {
+        const mac = m.mac || m.vc_mac || '';
+        if (!mac) continue;
+        const s = m.status
+          || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : null);
+        if (s) liveStatus[normaliseMac(mac)] = s;
       }
-      // Final fallback: just use the first member id
-      if (!masterId) masterId = vc.members.find((m) => m.id)?.id;
-    }
 
-    // --- Step 2: /vc endpoint (bulk status for all members in one call) ---
-    if (masterId && vc.site_id) {
-      try {
-        const vcUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${masterId}/vc`;
-        console.log(`[Mist] GET ${vcUrl}`);
-        const vcRes = await fetch(vcUrl, { headers: mistHeaders() });
-        if (vcRes.ok) {
-          const vcData = await vcRes.json();
-          const statsArr = Array.isArray(vcData) ? vcData
-                         : Array.isArray(vcData.members) ? vcData.members
-                         : [];
-          const statusByMac = {};
-          for (const m of statsArr) {
-            if (m.mac) {
-              statusByMac[normaliseMac(m.mac)] =
-                m.status || (m.up === false ? 'disconnected' : m.up === true ? 'connected' : undefined);
-            }
-          }
-          for (const member of vc.members) {
-            const s = statusByMac[normaliseMac(member.mac)];
-            if (s !== undefined) member.status = s;
-          }
-        }
-      } catch (e) {
-        console.warn(`[Mist] /vc status failed for ${vc.vc_mac}: ${e.message}`);
+      // Override baseline only when live data is available
+      for (const member of vc.members) {
+        const live = liveStatus[normaliseMac(member.mac)];
+        if (live) member.status = live;
       }
-    }
-
-    // --- Step 3: fallback — per-member /stats/devices/{id} for any still 'unknown' ---
-    const unknownMembers = vc.members.filter((m) => m.status === 'unknown' && m.id && vc.site_id);
-    if (unknownMembers.length) {
-      await Promise.all(unknownMembers.map(async (member) => {
-        try {
-          const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${member.id}`;
-          console.log(`[Mist] GET ${statsUrl}`);
-          const sRes = await fetch(statsUrl, { headers: mistHeaders() });
-          if (!sRes.ok) return;
-          const sData = await sRes.json();
-          // status field or derive from 'up' boolean
-          member.status = sData.status
-            || (sData.up === false ? 'disconnected' : sData.up === true ? 'connected' : 'unknown');
-        } catch (e) {
-          console.warn(`[Mist] /stats/devices failed for member ${member.mac}: ${e.message}`);
-        }
-      }));
+    } catch (e) {
+      console.warn(`[Mist] /vc live status failed for ${vc.vc_mac}: ${e.message}`);
     }
   }));
 
