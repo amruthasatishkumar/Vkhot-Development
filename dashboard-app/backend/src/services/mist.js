@@ -275,11 +275,17 @@ async function listVirtualChassis() {
 
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
 
-  // Group members by vc_mac (the shared Virtual Chassis identifier).
-  // Fall back to grouping by the device's own mac if vc_mac is absent.
+  // Only keep entries that belong to a Virtual Chassis (vc_mac must be present).
+  const vcMembers = (Array.isArray(inventory) ? inventory : []).filter(
+    (d) => d.vc_mac && d.vc_mac.trim() !== ''
+  );
+  console.log(`[Mist] VC members after vc_mac filter: ${vcMembers.length}`);
+  if (!vcMembers.length) return [];
+
+  // Group by vc_mac — the shared chassis identifier.
   const vcMap = new Map();
-  for (const d of inventory) {
-    const chassisMac = normaliseMac(d.vc_mac || d.mac || '');
+  for (const d of vcMembers) {
+    const chassisMac = normaliseMac(d.vc_mac);
     if (!chassisMac) continue;
     if (!vcMap.has(chassisMac)) {
       vcMap.set(chassisMac, {
