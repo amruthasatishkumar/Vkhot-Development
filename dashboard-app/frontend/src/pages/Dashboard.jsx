@@ -2,6 +2,11 @@ import { useState } from 'react';
 
 const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
+const VIEWS = [
+  { value: 'bulk-networks',     label: 'Create Bulk Networks' },
+  { value: 'bulk-port-profile', label: 'Create Bulk Port Profile' },
+];
+
 function RemoveSection() {
   const [mac,        setMac]        = useState('');
   const [macError,   setMacError]   = useState('');
@@ -88,6 +93,7 @@ function RemoveSection() {
 }
 
 export default function Dashboard() {
+  const [view,       setView]       = useState('bulk-networks');
   const [mac,        setMac]        = useState('');
   const [vlanCount,  setVlanCount]  = useState('');
   const [macError,   setMacError]   = useState('');
@@ -144,17 +150,41 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-6 max-w-3xl">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Networks</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      {/* Header with dropdown */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <p className="flex-1 text-sm text-gray-500">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
+        <select
+          value={view}
+          onChange={(e) => { setView(e.target.value); setResult(null); setApiError(''); }}
+          className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-semibold
+                     text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+        >
+          {VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
       </div>
 
-      {/* MAC Input Card */}
+      {/* Page title */}
+      <h1 className="text-2xl font-bold text-gray-900">
+        {VIEWS.find((v) => v.value === view)?.label}
+      </h1>
+
+      {/* Bulk Port Profile — coming soon */}
+      {view === 'bulk-port-profile' && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <span className="text-5xl mb-4">🔌</span>
+          <h2 className="text-lg font-semibold text-gray-700">Create Bulk Port Profile</h2>
+          <p className="text-sm text-gray-400 mt-1">This feature is coming soon.</p>
+        </div>
+      )}
+
+      {/* Bulk Networks */}
+      {view === 'bulk-networks' && (<>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="text-base font-semibold text-gray-800 mb-1">Create VLANs on a Staging Device</h2>
         <p className="text-sm text-gray-500 mb-5">
@@ -281,6 +311,8 @@ export default function Dashboard() {
 
       {/* Remove VLANs */}
       <RemoveSection />
+
+      </>)}
 
     </div>
   );
