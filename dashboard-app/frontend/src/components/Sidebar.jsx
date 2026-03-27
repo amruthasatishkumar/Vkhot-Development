@@ -8,7 +8,7 @@ export default function Sidebar({ dark, onToggleDark }) {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
         <span className="text-xl font-bold text-brand-600 dark:text-brand-400 tracking-tight">
-          ◈ MyDashboard
+          ◈ My Automation World
         </span>
       </div>
 
