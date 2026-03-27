@@ -1,8 +1,5 @@
 const NAV_ITEMS = [
-  { label: 'Dashboard',  icon: '▣', href: '#' },
-  { label: 'Analytics',  icon: '📈', href: '#' },
-  { label: 'Reports',    icon: '📋', href: '#' },
-  { label: 'Settings',   icon: '⚙',  href: '#' },
+  { label: 'Networks', icon: '🌐', href: '#' },
 ];
 
 export default function Sidebar() {

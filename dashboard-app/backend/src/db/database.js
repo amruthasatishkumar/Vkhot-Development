@@ -71,34 +71,6 @@ async function init() {
     );
   `);
 
-  const count = get('SELECT COUNT(*) AS cnt FROM metrics');
-  if (!count || count.cnt === 0) {
-    const seeds = [
-      ['Total Users',       '12,450', 'users', '+8.2%',  'up'],
-      ['Monthly Revenue',   '48,302', 'USD',   '+12.5%', 'up'],
-      ['Active Sessions',   '342',    '',      '-2.1%',  'down'],
-      ['Avg Response Time', '145',    'ms',    '-5.3%',  'down'],
-    ];
-    for (const row of seeds) {
-      run('INSERT INTO metrics (label, value, unit, change, change_type) VALUES (?,?,?,?,?)', row);
-    }
-    console.log('Database seeded with sample metrics.');
-  }
-
-  const logCount = get('SELECT COUNT(*) AS cnt FROM activity_log');
-  if (!logCount || logCount.cnt === 0) {
-    const logs = [
-      ['User signed up',       'john.doe@example.com'],
-      ['Payment received',     '$299 – Pro Plan'],
-      ['Server restarted',     'Scheduled maintenance'],
-      ['New report generated', 'Q1 2026 Summary'],
-      ['Alert resolved',       'High memory usage on node-02'],
-    ];
-    for (const row of logs) {
-      run('INSERT INTO activity_log (event, detail) VALUES (?,?)', row);
-    }
-  }
-
   save();
 }
 
