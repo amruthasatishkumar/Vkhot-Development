@@ -37,7 +37,7 @@ function RemoveSection() {
 
   return (
     <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
-      <h2 className="text-base font-semibold text-gray-800 mb-1">Remove App-Created VLANs</h2>
+      <h2 className="text-base font-semibold text-gray-800 mb-1">Delete Recently Created VLANs</h2>
       <p className="text-sm text-gray-500 mb-5">
         Enter a switch MAC address to remove all <code className="bg-gray-100 px-1 rounded text-xs">VLAN_XXX</code> networks created by this app.
       </p>
@@ -156,7 +156,7 @@ export default function Dashboard() {
 
       {/* MAC Input Card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-1">Provision VLANs on a Juniper Switch</h2>
+        <h2 className="text-base font-semibold text-gray-800 mb-1">Create VLANs on a Staging Device</h2>
         <p className="text-sm text-gray-500 mb-5">
           Enter a switch MAC address and the number of VLANs to create on that device.
         </p>
@@ -202,7 +202,7 @@ export default function Dashboard() {
             className="w-full sm:w-auto px-6 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50
                        text-white text-sm font-semibold rounded-lg transition-colors"
           >
-            {loading ? 'Provisioning…' : 'Provision Networks'}
+            {loading ? 'Creating…' : 'Create VLANs'}
           </button>
         </form>
       </div>
