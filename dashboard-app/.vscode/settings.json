@@ -1,0 +1,17 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/backend/data": true,
+    "**/frontend/dist": true,
+    "**/.vite": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/backend/data/**": true,
+    "**/frontend/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/frontend/dist": true
+  }
+}
