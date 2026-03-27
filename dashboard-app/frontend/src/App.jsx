@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard.jsx';
 import BouncePortPage from './pages/BouncePortPage.jsx';
+import VirtualChassisPage from './pages/VirtualChassisPage.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
 export default function App() {
@@ -24,8 +25,9 @@ export default function App() {
       <Sidebar dark={dark} onToggleDark={() => setDark((d) => !d)} activePage={page} onNavigate={setPage} bounceActive={bounceActive} />
       <main className="flex-1 overflow-y-auto p-8">
         {/* Both pages stay mounted so bounce intervals survive navigation */}
-        <div className={page !== 'dashboard'   ? 'hidden' : ''}><Dashboard /></div>
-        <div className={page !== 'bounce-port' ? 'hidden' : ''}><BouncePortPage onBounceStatusChange={setBounceActive} /></div>
+        <div className={page !== 'dashboard'        ? 'hidden' : ''}><Dashboard /></div>
+        <div className={page !== 'bounce-port'      ? 'hidden' : ''}><BouncePortPage onBounceStatusChange={setBounceActive} /></div>
+        <div className={page !== 'virtual-chassis'  ? 'hidden' : ''}><VirtualChassisPage /></div>
       </main>
     </div>
   );

@@ -251,7 +251,52 @@ async function bouncePortsOnce(siteId, deviceId, portIds) {
   return text ? JSON.parse(text) : {};
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce };
+/**
+ * List all Virtual Chassis devices in the org.
+ * Groups VC members by vc_mac, sorted master → backup → linecard.
+ * Returns [{ vc_mac, members: [{ id, mac, name, model, vc_role, serial, site_id, status }] }]
+ */
+async function listVirtualChassis() {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory`;
+  console.log(`[Mist] GET ${url}`);
+  const res = await fetch(url, { headers: mistHeaders() });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Mist inventory lookup failed (${res.status}): ${body}`);
+  }
+  const devices = await res.json();
+
+  // Mist sets vc_mac and/or vc_role on VC member entries
+  const vcMembers = devices.filter((d) => d.type === 'switch' && (d.vc_mac || d.vc_role));
+  if (vcMembers.length === 0) return [];
+
+  // Group by vc_mac — fallback to device mac if vc_mac absent
+  const groups = {};
+  for (const d of vcMembers) {
+    const key = d.vc_mac ? normaliseMac(d.vc_mac) : normaliseMac(d.mac);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({
+      id:      d.id,
+      mac:     d.mac,
+      name:    d.name   || 'Unnamed',
+      model:   d.model  || 'Unknown',
+      vc_role: d.vc_role || 'unknown',
+      serial:  d.serial  || '',
+      site_id: d.site_id || '',
+      status:  d.connected ? 'connected' : 'disconnected',
+    });
+  }
+
+  const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
+  return Object.entries(groups).map(([vc_mac, members]) => ({
+    vc_mac,
+    members: members.sort((a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)),
+  }));
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis };
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
 

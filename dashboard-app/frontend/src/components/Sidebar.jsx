@@ -1,6 +1,7 @@
 const NAV_ITEMS = [
   { label: 'Networks & Port Profiles', icon: '🌐', page: 'dashboard' },
   { label: 'Bounce Port',              icon: '🔄', page: 'bounce-port' },
+  { label: 'Virtual Chassis',          icon: '🔗', page: 'virtual-chassis' },
 ];
 
 export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bounceActive }) {

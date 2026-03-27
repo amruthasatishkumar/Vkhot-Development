@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis } = require('../services/mist');
 
 const router = express.Router();
 
@@ -140,6 +140,16 @@ router.post('/bounce-once', async (req, res) => {
   try {
     await bouncePortsOnce(siteId, deviceId, portIds);
     res.json({ bounced: portIds.length, timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// GET /api/networks/virtual-chassis — list all VC devices in the org
+router.get('/virtual-chassis', async (_req, res) => {
+  try {
+    const vcs = await listVirtualChassis();
+    res.json({ count: vcs.length, virtualChassis: vcs });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
