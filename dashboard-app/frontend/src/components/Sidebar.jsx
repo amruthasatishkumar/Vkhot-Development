@@ -2,12 +2,12 @@ const NAV_ITEMS = [
   { label: 'Networks', icon: '🌐', href: '#' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ dark, onToggleDark }) {
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-gray-200">
-        <span className="text-xl font-bold text-brand-600 tracking-tight">
+      <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+        <span className="text-xl font-bold text-brand-600 dark:text-brand-400 tracking-tight">
           ◈ MyDashboard
         </span>
       </div>
@@ -18,8 +18,11 @@ export default function Sidebar() {
           <a
             key={label}
             href={href}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600
-                       hover:bg-brand-50 hover:text-brand-700 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
+                       text-gray-600 dark:text-gray-300
+                       hover:bg-brand-50 dark:hover:bg-gray-800
+                       hover:text-brand-700 dark:hover:text-brand-400
+                       transition-colors"
           >
             <span className="text-base">{icon}</span>
             {label}
@@ -27,8 +30,21 @@ export default function Sidebar() {
         ))}
       </nav>
 
+      {/* Dark mode toggle */}
+      <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={onToggleDark}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium
+                     text-gray-600 dark:text-gray-300
+                     hover:bg-gray-100 dark:hover:bg-gray-800
+                     transition-colors"
+        >
+          <span>{dark ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+        </button>
+      </div>
+
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-200 text-xs text-gray-400">
+      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
         v1.0 · Local
       </div>
     </aside>

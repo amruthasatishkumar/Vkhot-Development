@@ -41,10 +41,10 @@ function RemoveSection() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
-      <h2 className="text-base font-semibold text-gray-800 mb-1">Delete Recently Created VLANs</h2>
-      <p className="text-sm text-gray-500 mb-5">
-        Enter a switch MAC address to remove all <code className="bg-gray-100 px-1 rounded text-xs">VLAN_XXX</code> networks created by this app.
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-sm p-6">
+      <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Delete Recently Created VLANs</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+        Enter a switch MAC address to remove all <code className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1 rounded text-xs">VLAN_XXX</code> networks created by this app.
       </p>
 
       <form onSubmit={handleRemove} className="flex flex-col sm:flex-row gap-3">
@@ -55,8 +55,9 @@ function RemoveSection() {
             value={mac}
             onChange={(e) => { setMac(e.target.value); setMacError(''); setResult(null); setApiError(''); }}
             className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono
+              bg-white dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400
               focus:outline-none focus:ring-2 focus:ring-red-400
-              ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+              ${macError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
           />
           {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
         </div>
@@ -71,7 +72,7 @@ function RemoveSection() {
       </form>
 
       {apiError && (
-        <div className="mt-4 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700">
+        <div className="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-700 dark:text-red-400">
           <strong>Error:</strong> {apiError}
         </div>
       )}
@@ -79,8 +80,8 @@ function RemoveSection() {
       {result && (
         <div className={`mt-4 rounded-xl px-5 py-4 text-sm border
           ${result.removed > 0
-            ? 'bg-green-50 border-green-200 text-green-700'
-            : 'bg-yellow-50 border-yellow-200 text-yellow-700'}`}
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+            : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400'}`}
         >
           {result.removed > 0
             ? <>✓ <strong>{result.removed} VLAN{result.removed !== 1 ? 's' : ''}</strong> removed from <strong>{result.switch.name}</strong> ({result.switch.mac})</>
@@ -123,16 +124,16 @@ function RemoveProfilesSection() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6">
-      <h2 className="text-base font-semibold text-gray-800 mb-1">Delete Recently Created Port Profiles</h2>
-      <p className="text-sm text-gray-500 mb-5">
-        Removes all <code className="bg-gray-100 px-1 rounded text-xs">PROFILE_XXX</code> entries from the device.
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-sm p-6">
+      <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Delete Recently Created Port Profiles</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+        Removes all <code className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1 rounded text-xs">PROFILE_XXX</code> entries from the device.
       </p>
       <form onSubmit={handleRemove} className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <input type="text" placeholder="e.g. AA:BB:CC:DD:EE:FF" value={mac}
             onChange={(e) => { setMac(e.target.value); setMacError(''); setResult(null); setApiError(''); }}
-            className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-400 ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+            className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 ${macError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
           />
           {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
         </div>
@@ -141,9 +142,9 @@ function RemoveProfilesSection() {
           {loading ? 'Removing…' : 'Remove Profiles'}
         </button>
       </form>
-      {apiError && <div className="mt-4 rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700"><strong>Error:</strong> {apiError}</div>}
+      {apiError && <div className="mt-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-700 dark:text-red-400"><strong>Error:</strong> {apiError}</div>}
       {result && (
-        <div className={`mt-4 rounded-xl px-5 py-4 text-sm border ${result.removed > 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-yellow-50 border-yellow-200 text-yellow-700'}`}>
+        <div className={`mt-4 rounded-xl px-5 py-4 text-sm border ${result.removed > 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400'}`}>
           {result.removed > 0
             ? <>✓ <strong>{result.removed} profile{result.removed !== 1 ? 's' : ''}</strong> removed from <strong>{result.switch.name}</strong> ({result.switch.mac})</>
             : <>No app-created profiles found on <strong>{result.switch.name}</strong> — nothing to remove.</>}
@@ -200,36 +201,36 @@ function BulkPortProfileView() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-1">Create Port Profiles on a Staging Device</h2>
-        <p className="text-sm text-gray-500 mb-5">
-          Randomly assigns existing <code className="bg-gray-100 px-1 rounded text-xs">VLAN_XXX</code> networks as Port and VoIP networks per profile.
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Create Port Profiles on a Staging Device</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          Randomly assigns existing <code className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1 rounded text-xs">VLAN_XXX</code> networks as Port and VoIP networks per profile.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Switch MAC Address</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Switch MAC Address</label>
               <input type="text" placeholder="e.g. AA:BB:CC:DD:EE:FF" value={mac}
                 onChange={(e) => { setMac(e.target.value); setMacError(''); }}
-                className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono bg-white dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 ${macError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
               />
               {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
             </div>
             <div className="w-full sm:w-40">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Profile Count (1–100)</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Profile Count (1–100)</label>
               <input type="number" min="1" max="100" placeholder="e.g. 2" value={profileCount}
                 onChange={(e) => { setProfileCount(e.target.value); setCountError(''); }}
-                className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${countError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                className={`w-full px-4 py-2.5 rounded-lg border text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500 ${countError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
               />
               {countError && <p className="text-xs text-red-500 mt-1">{countError}</p>}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-2">Port Mode</label>
-            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Port Mode</label>
+            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
               {['access', 'trunk'].map((m) => (
                 <button key={m} type="button" onClick={() => setMode(m)}
-                  className={`px-5 py-2 text-sm font-semibold transition-colors capitalize ${mode === m ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  className={`px-5 py-2 text-sm font-semibold transition-colors capitalize ${mode === m ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>
                   {m}
                 </button>
               ))}
@@ -242,25 +243,25 @@ function BulkPortProfileView() {
         </form>
       </div>
 
-      {apiError && <div className="rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700"><strong>Error:</strong> {apiError}</div>}
+      {apiError && <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-700 dark:text-red-400"><strong>Error:</strong> {apiError}</div>}
 
       {result && (
         <div className="space-y-4">
-          <div className="bg-brand-50 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
-            <p className="font-semibold text-brand-700">Switch found ✓</p>
-            <p className="text-gray-600 mt-0.5">
+          <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
+            <p className="font-semibold text-brand-700 dark:text-brand-400">Switch found ✓</p>
+            <p className="text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-medium">Name:</span> {result.switch.name} &nbsp;·&nbsp;
               <span className="font-medium">MAC:</span> {result.switch.mac}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 {result.created.length} Profile{result.created.length !== 1 ? 's' : ''} Created
               </p>
             </div>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+              <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 <tr>
                   <th className="text-left px-5 py-3">Profile Name</th>
                   <th className="text-left px-5 py-3">Mode</th>
@@ -269,15 +270,15 @@ function BulkPortProfileView() {
                   <th className="text-left px-5 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {result.created.map((p) => (
-                  <tr key={p.name} className="hover:bg-gray-50">
-                    <td className="px-5 py-3 font-medium text-gray-800">{p.name}</td>
-                    <td className="px-5 py-3 capitalize text-gray-600">{p.mode}</td>
-                    <td className="px-5 py-3 font-mono text-gray-700">{p.port_network}</td>
-                    <td className="px-5 py-3 font-mono text-gray-700">{p.voip_network}</td>
+                  <tr key={p.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">{p.name}</td>
+                    <td className="px-5 py-3 capitalize text-gray-600 dark:text-gray-300">{p.mode}</td>
+                    <td className="px-5 py-3 font-mono text-gray-700 dark:text-gray-200">{p.port_network}</td>
+                    <td className="px-5 py-3 font-mono text-gray-700 dark:text-gray-200">{p.voip_network}</td>
                     <td className="px-5 py-3">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Created</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">✓ Created</span>
                     </td>
                   </tr>
                 ))}
@@ -287,7 +288,7 @@ function BulkPortProfileView() {
         </div>
       )}
 
-      <hr className="border-gray-200" />
+      <hr className="border-gray-200 dark:border-gray-700" />
       <RemoveProfilesSection />
     </div>
   );
@@ -355,14 +356,14 @@ export default function Dashboard() {
 
       {/* Header with dropdown */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <p className="flex-1 text-sm text-gray-500">
+        <p className="flex-1 text-sm text-gray-500 dark:text-gray-400">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
         <select
           value={view}
           onChange={(e) => { setView(e.target.value); setResult(null); setApiError(''); }}
-          className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-semibold
-                     text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+          className="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-semibold
+                     text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
         >
           {VIEWS.map((v) => (
             <option key={v.value} value={v.value}>{v.label}</option>
@@ -371,7 +372,7 @@ export default function Dashboard() {
       </div>
 
       {/* Page title */}
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
         {VIEWS.find((v) => v.value === view)?.label}
       </h1>
 
@@ -380,9 +381,9 @@ export default function Dashboard() {
 
       {/* Bulk Networks */}
       {view === 'bulk-networks' && (<>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-1">Create VLANs on a Staging Device</h2>
-        <p className="text-sm text-gray-500 mb-5">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Create VLANs on a Staging Device</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
           Enter a switch MAC address and the number of VLANs to create on that device.
         </p>
 
@@ -390,22 +391,23 @@ export default function Dashboard() {
           <div className="flex flex-col sm:flex-row gap-3">
             {/* MAC Address */}
             <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Switch MAC Address</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Switch MAC Address</label>
               <input
                 type="text"
                 placeholder="e.g. AA:BB:CC:DD:EE:FF"
                 value={mac}
                 onChange={(e) => { setMac(e.target.value); setMacError(''); }}
                 className={`w-full px-4 py-2.5 rounded-lg border text-sm font-mono
+                  bg-white dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400
                   focus:outline-none focus:ring-2 focus:ring-brand-500
-                  ${macError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                  ${macError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
               />
               {macError && <p className="text-xs text-red-500 mt-1">{macError}</p>}
             </div>
 
             {/* VLAN Count */}
             <div className="w-full sm:w-40">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">VLAN Count (1–4000)</label>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">VLAN Count (1–4000)</label>
               <input
                 type="number"
                 min="1"
@@ -414,8 +416,9 @@ export default function Dashboard() {
                 value={vlanCount}
                 onChange={(e) => { setVlanCount(e.target.value); setCountError(''); }}
                 className={`w-full px-4 py-2.5 rounded-lg border text-sm
+                  bg-white dark:bg-gray-700 dark:text-gray-100
                   focus:outline-none focus:ring-2 focus:ring-brand-500
-                  ${countError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                  ${countError ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-gray-600'}`}
               />
               {countError && <p className="text-xs text-red-500 mt-1">{countError}</p>}
             </div>
@@ -434,7 +437,7 @@ export default function Dashboard() {
 
       {/* API Error */}
       {apiError && (
-        <div className="rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700">
+        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-700 dark:text-red-400">
           <strong>Error:</strong> {apiError}
         </div>
       )}
@@ -443,9 +446,9 @@ export default function Dashboard() {
       {result && (
         <div className="space-y-4">
           {/* Switch info */}
-          <div className="bg-brand-50 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
-            <p className="font-semibold text-brand-700">Switch found ✓</p>
-            <p className="text-gray-600 mt-0.5">
+          <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-500/20 rounded-xl px-5 py-4 text-sm">
+            <p className="font-semibold text-brand-700 dark:text-brand-400">Switch found ✓</p>
+            <p className="text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-medium">Name:</span> {result.switch.name} &nbsp;·&nbsp;
               <span className="font-medium">MAC:</span> {result.switch.mac} &nbsp;·&nbsp;
               <span className="font-medium">Site ID:</span> {result.switch.site_id}
@@ -454,14 +457,14 @@ export default function Dashboard() {
 
           {/* Created VLANs table */}
           {result.created.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                   {result.created.length} VLANs Created
                 </p>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   <tr>
                     <th className="text-left px-5 py-3">VLAN ID</th>
                     <th className="text-left px-5 py-3">Name</th>
@@ -469,14 +472,14 @@ export default function Dashboard() {
                     <th className="text-left px-5 py-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {result.created.map((v) => (
-                    <tr key={v.id || v.vlan_id} className="hover:bg-gray-50">
-                      <td className="px-5 py-3 font-mono text-gray-700">{v.vlan_id}</td>
-                      <td className="px-5 py-3 font-medium text-gray-800">{v.name}</td>
-                      <td className="px-5 py-3 font-mono text-gray-600">{v.subnet}</td>
+                    <tr key={v.id || v.vlan_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-5 py-3 font-mono text-gray-700 dark:text-gray-200">{v.vlan_id}</td>
+                      <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">{v.name}</td>
+                      <td className="px-5 py-3 font-mono text-gray-600 dark:text-gray-300">{v.subnet}</td>
                       <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                           ✓ Created
                         </span>
                       </td>
@@ -489,7 +492,7 @@ export default function Dashboard() {
 
           {/* Failed VLANs */}
           {result.failed && result.failed.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-5 py-4 text-sm text-red-700 dark:text-red-400">
               <p className="font-semibold mb-2">Failed to create {result.failed.length} VLAN(s):</p>
               <ul className="list-disc list-inside space-y-1">
                 {result.failed.map((f, i) => (
@@ -502,7 +505,7 @@ export default function Dashboard() {
       )}
 
       {/* Divider */}
-      <hr className="border-gray-200" />
+      <hr className="border-gray-200 dark:border-gray-700" />
 
       {/* Remove VLANs */}
       <RemoveSection />
