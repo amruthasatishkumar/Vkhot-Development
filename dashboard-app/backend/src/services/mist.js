@@ -533,7 +533,49 @@ async function updateOrgNetworkTemplate(orgId, templateId, networksMap) {
   return putText ? JSON.parse(putText) : { ok: true };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate };
+/**
+ * Remove named networks from an org-level network template.
+ * Fetches current state, deletes specified keys, then PUTs back.
+ *
+ * @param {string}   orgId
+ * @param {string}   templateId
+ * @param {string[]} networkNames  - Array of network name keys to remove
+ * @returns {object}               - Updated template from Mist API
+ */
+async function deleteOrgNetworkTemplateNetworks(orgId, templateId, networkNames) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/orgs/${orgId}/networktemplates/${templateId}`;
+
+  const getRes = await fetch(url, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const text = await getRes.text();
+    throw new Error(`Failed to fetch template for deletion (${getRes.status}): ${text}`);
+  }
+  const current = await getRes.json();
+
+  const remaining = { ...(current.networks || {}) };
+  for (const name of networkNames) delete remaining[name];
+
+  const merged = { ...current, networks: remaining };
+
+  console.log(`[Mist] PUT ${url} (remove ${networkNames.length} networks from template)`);
+  const putRes = await fetch(url, {
+    method:  'PUT',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+    body:    JSON.stringify(merged),
+  });
+
+  if (!putRes.ok) {
+    const text = await putRes.text();
+    throw new Error(`Mist delete networks failed (${putRes.status}): ${text}`);
+  }
+
+  const putText = await putRes.text();
+  return putText ? JSON.parse(putText) : { ok: true };
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {

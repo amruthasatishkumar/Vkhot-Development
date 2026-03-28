@@ -1,10 +1,9 @@
 const express = require('express');
-const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate } = require('../services/mist');
+const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks } = require('../services/mist');
 
 const router = express.Router();
 
 // POST /api/switch-templates
-// Creates an org-level network template.
 router.post('/', async (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -19,7 +18,6 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/switch-templates/:id
-// Fetches template and attaches the canonical Mist API endpoint.
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -31,20 +29,32 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET /api/switch-templates/:id/networks
+// Returns all networks currently on the template as an array.
+router.get('/:id/networks', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const template = await getOrgNetworkTemplate(process.env.MIST_ORG_ID, id);
+    const networks = Object.entries(template.networks || {}).map(([name, v]) => ({
+      name, vlan_id: v.vlan_id, subnet: v.subnet,
+    }));
+    res.json({ networks });
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
 // PUT /api/switch-templates/:id/networks
-// Body: { networks: [{ name, vlan_id, subnet }] }
-// Merges the provided networks into the template.
+// Body: { networks: [{ name, vlan_id, subnet }] } — merges into template.
 router.put('/:id/networks', async (req, res) => {
   const { id } = req.params;
   const { networks } = req.body;
-
   if (!Array.isArray(networks) || networks.length === 0) {
     return res.status(400).json({ error: 'networks must be a non-empty array.' });
   }
   if (networks.length > 4000) {
     return res.status(400).json({ error: 'Cannot create more than 4000 networks at once.' });
   }
-
   const networksMap = {};
   for (const net of networks) {
     if (!net.name || typeof net.vlan_id !== 'number' || !net.subnet) {
@@ -52,9 +62,24 @@ router.put('/:id/networks', async (req, res) => {
     }
     networksMap[net.name] = { vlan_id: net.vlan_id, subnet: net.subnet };
   }
-
   try {
     const result = await updateOrgNetworkTemplate(process.env.MIST_ORG_ID, id, networksMap);
+    res.json(result);
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
+// DELETE /api/switch-templates/:id/networks
+// Body: { names: [string] } — removes named networks from template.
+router.delete('/:id/networks', async (req, res) => {
+  const { id } = req.params;
+  const { names } = req.body;
+  if (!Array.isArray(names) || names.length === 0) {
+    return res.status(400).json({ error: 'names must be a non-empty array of network name strings.' });
+  }
+  try {
+    const result = await deleteOrgNetworkTemplateNetworks(process.env.MIST_ORG_ID, id, names);
     res.json(result);
   } catch (err) {
     res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
