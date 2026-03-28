@@ -15,7 +15,7 @@ const VC_BACK_ITEMS = [
   'For VC features',
 ];
 
-function FlipCard({ title, backHeader, backItems, onClick, accent = '#6366f1', icon = '⚡' }) {
+function FlipCard({ title, backHeader, backItems, onClick }) {
   const [flipped, setFlipped] = useState(false);
 
   const faceBase = {
@@ -23,7 +23,7 @@ function FlipCard({ title, backHeader, backItems, onClick, accent = '#6366f1', i
     backfaceVisibility: 'hidden',
     WebkitBackfaceVisibility: 'hidden',
     borderRadius: '1rem',
-    padding: '1.25rem 1.5rem',
+    padding: '1.5rem',
     display: 'flex',
     flexDirection: 'column',
   };
@@ -33,11 +33,12 @@ function FlipCard({ title, backHeader, backItems, onClick, accent = '#6366f1', i
       style={{
         perspective: '1000px',
         height: '160px',
+        // Spring easing (0.34, 1.56, 0.64, 1) overshoots slightly → natural bounce
         transform: flipped ? 'translateY(-10px) scale(1.05)' : 'translateY(0px) scale(1)',
         transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
         filter: flipped
-          ? 'drop-shadow(0 24px 48px rgba(0,0,0,0.45))'
-          : 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))',
+          ? 'drop-shadow(0 24px 48px rgba(0,0,0,0.22))'
+          : 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))',
       }}
       onMouseEnter={() => setFlipped(true)}
       onMouseLeave={() => setFlipped(false)}
@@ -49,36 +50,15 @@ function FlipCard({ title, backHeader, backItems, onClick, accent = '#6366f1', i
         transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
       }}>
 
-        {/* Front — dark card style */}
+        {/* Front */}
         <div
-          style={{ ...faceBase, backgroundColor: '#1e2030', border: 'none' }}
+          className="dark:!bg-amber-50"
+          style={{ ...faceBase, backgroundColor: 'white', border: '1px solid #f3f4f6' }}
         >
-          {/* Three-dot menu (decorative) + icon chip */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-            <div style={{
-              width: '2rem', height: '2rem', borderRadius: '0.5rem',
-              backgroundColor: `${accent}22`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1rem',
-            }}>
-              <span style={{ filter: 'none' }}>{icon}</span>
-            </div>
-            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem', letterSpacing: '0.05em' }}>⋮</span>
-          </div>
-          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.01em', color: accent, lineHeight: 1.3, margin: 0 }}>
+          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
             {title}
           </p>
-          <span style={{
-            marginTop: 'auto',
-            fontSize: '0.7rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            backgroundColor: `${accent}33`,
-            border: `1px solid ${accent}55`,
-            borderRadius: '0.4rem',
-            padding: '0.2rem 0.5rem',
-            alignSelf: 'flex-start',
-          }}>
+          <span style={{ marginTop: 'auto', fontSize: '0.75rem', fontWeight: 500, color: '#9ca3af' }}>
             Hover to preview →
           </span>
         </div>
@@ -318,25 +298,19 @@ export default function DashboardHome({ onNavigate }) {
           backHeader="Here you can create Bulk"
           backItems={NETWORKS_BACK_ITEMS}
           onClick={() => onNavigate('networks')}
-          accent="#22c55e"
-          icon="🌐"
         />
         <FlipCard
           title="Bounce Ports"
           backHeader="Here you can Continuously Bounce Port"
           backItems={BOUNCE_BACK_ITEMS}
           onClick={() => onNavigate('bounce-port')}
-          accent="#ef4444"
-          icon="🔄"
         />
         <FlipCard
           title="Virtual Chassis"
           backHeader="Here you can run VC automation"
           backItems={VC_BACK_ITEMS}
-          onClick={() => onNavigate('virtual-chassis')}
-          accent="#eab308"
-          icon="🔗"
-        />
+          onClick={() => onNavigate('virtual-chassis')
+        }/>
       </div>
 
       {/* Runs in Progress */}
