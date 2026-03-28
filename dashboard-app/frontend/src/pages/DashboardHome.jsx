@@ -248,18 +248,18 @@ function useInventoryStats() {
 
 // ── Per-device-type inventory card ───────────────────────────────────────────
 const INV_CARDS = [
-  { key: 'standalone', label: 'Standalone Switches', icon: '🔌', accent: '#2563eb', labelColor: '#1e40af', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#2563eb' },
-  { key: 'vc',         label: 'VC Switches',         icon: '🔗', accent: '#7c3aed', labelColor: '#5b21b6', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#7c3aed' },
-  { key: 'ap',         label: 'Access Points',       icon: '📡', accent: '#d97706', labelColor: '#92400e', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#d97706' },
+  { key: 'standalone', label: 'Standalone Switches', icon: '🔌' },
+  { key: 'vc',         label: 'VC Switches',         icon: '🔗' },
+  { key: 'ap',         label: 'Access Points',       icon: '📡' },
 ];
 
 function InventoryPanel() {
   const { data, loading, error, lastUpdated, refresh } = useInventoryStats();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-1">
         <p className="text-sm font-bold text-gray-700 dark:text-gray-200 tracking-tight flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             {loading
@@ -276,47 +276,53 @@ function InventoryPanel() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-xs text-red-600 dark:text-red-400">
+        <div className="rounded-xl bg-red-900/40 border border-red-700 px-4 py-3 text-xs text-red-400">
           {error}
         </div>
       )}
 
       {/* Cards */}
-      {INV_CARDS.map(({ key, label, icon, accent, labelColor, connColor, discColor, borderTop }) => {
-        const d = data?.[key];
+      {INV_CARDS.map(({ key, label, icon }) => {
+        const d            = data?.[key];
         const total        = loading && !d ? null : (d?.total        ?? 0);
         const connected    = loading && !d ? null : (d?.connected    ?? 0);
         const disconnected = loading && !d ? null : (d?.disconnected ?? 0);
+        const hasDisc      = disconnected !== null && disconnected > 0;
         return (
           <div key={key}
-            className="rounded-2xl bg-white dark:bg-gray-800 shadow-md px-5 py-4"
-            style={{ borderTop: `4px solid ${borderTop}`, border: `1px solid #e5e7eb`, borderTopWidth: '4px', borderTopColor: borderTop }}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl leading-none">{icon}</span>
-              <p className="text-xs font-bold tracking-tight leading-tight" style={{ color: labelColor }}>{label}</p>
-            </div>
-            <p className="text-4xl font-extrabold leading-none mb-3" style={{ color: accent }}>
-              {total === null ? '—' : total}
+            className="rounded-2xl px-5 py-4 shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #1e2130 0%, #252a3a 100%)' }}>
+            {/* Label row */}
+            <p className="text-xs font-semibold tracking-widest uppercase mb-3"
+               style={{ color: 'rgba(255,255,255,0.45)' }}>
+              {icon} {label}
             </p>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block flex-shrink-0" />
-                  Connected
-                </span>
-                <span className="font-bold" style={{ color: connColor }}>
-                  {connected === null ? '…' : connected}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
-                  Disconnected
-                </span>
-                <span className="font-bold" style={{ color: discColor }}>
-                  {disconnected === null ? '…' : disconnected}
-                </span>
-              </div>
+            {/* Big total */}
+            <p className="text-4xl font-extrabold text-white leading-none mb-4"
+               style={{ letterSpacing: '-0.02em' }}>
+              {total === null ? '—' : total.toLocaleString()}
+            </p>
+            {/* Connected / Disconnected pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80' }}>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M4 7V1M1 4l3-3 3 3" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {connected === null ? '…' : connected}
+                <span style={{ color: 'rgba(74,222,128,0.6)', fontWeight: 400 }}>connected</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                style={{ background: hasDisc ? 'rgba(239,68,68,0.15)' : 'rgba(107,114,128,0.15)',
+                         color:      hasDisc ? '#f87171' : 'rgba(255,255,255,0.3)' }}>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M4 1v6M1 4l3 3 3-3"
+                    stroke={hasDisc ? '#f87171' : 'rgba(255,255,255,0.3)'}
+                    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {disconnected === null ? '…' : disconnected}
+                <span style={{ fontWeight: 400, opacity: 0.7 }}>disconnected</span>
+              </span>
             </div>
           </div>
         );
@@ -324,7 +330,7 @@ function InventoryPanel() {
 
       {/* Last updated */}
       {lastUpdated && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+        <p className="text-xs text-center mt-1" style={{ color: 'rgba(156,163,175,0.6)' }}>
           Updated {lastUpdated.toLocaleTimeString('en-US', { hour12: false })} · auto-refreshes every 30s
         </p>
       )}
