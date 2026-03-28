@@ -361,17 +361,12 @@ function PortProfilesTab({ templateId }) {
     load();
   }, [templateId]);
 
-  // For each profile, randomly pick two distinct networks from the available pool,
-  // and also randomise Speed, Duplex, and Mac Limit (same values applied to all profiles in the batch).
+  // For each profile, randomly pick two distinct networks and independent
+  // Speed, Duplex, and Mac Limit values (each profile gets its own set).
   function generateProfiles(n) {
     const SPEEDS  = ['auto', '10', '100', '1000', '2500', '5000', '10000'];
     const DUPLEX  = ['auto', 'half', 'full'];
     const pick    = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
-    // One shared set of values for the entire batch
-    const batchSpeed    = pick(SPEEDS);
-    const batchDuplex   = pick(DUPLEX);
-    const batchMacLimit = Math.floor(Math.random() * 255) + 1; // 1–255
 
     const usedProfileIds = new Set();
     const list           = [];
@@ -392,9 +387,9 @@ function PortProfilesTab({ templateId }) {
         mode,
         port_network: shuffled[portIdx].name,
         voip_network: shuffled[voipIdx].name,
-        speed:        batchSpeed,
-        duplex:       batchDuplex,
-        mac_limit:    batchMacLimit,
+        speed:        pick(SPEEDS),
+        duplex:       pick(DUPLEX),
+        mac_limit:    Math.floor(Math.random() * 255) + 1, // 1–255, unique per profile
       });
     }
     return list;
