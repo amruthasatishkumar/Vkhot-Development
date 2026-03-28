@@ -23,7 +23,7 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
     backfaceVisibility: 'hidden',
     WebkitBackfaceVisibility: 'hidden',
     borderRadius: '1rem',
-    padding: '1.75rem',
+    padding: '1.25rem 1.5rem',
     display: 'flex',
     flexDirection: 'column',
   };
@@ -73,18 +73,18 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
             cursor: 'pointer',
           }}
         >
-          <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+          <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: '0.5rem' }}>
             {backHeader}
           </p>
-          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             {backItems.map((item) => (
-              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>
+              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', fontWeight: 700, color: 'white', lineHeight: 1.3 }}>
                 <span style={{ color: '#a5f3fc', flexShrink: 0 }}>✓</span>
                 {item}
               </li>
             ))}
           </ul>
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'white', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Let's automate →
           </span>
         </div>
