@@ -430,7 +430,7 @@ async function listVirtualChassis() {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, automateVC };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, automateVC };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {
@@ -558,6 +558,85 @@ async function renumberVC(siteId, deviceId) {
 }
 
 /**
+ * Change fpc0's vc_role to the opposite of its current role.
+ * routing-engine → linecard, or linecard → routing-engine.
+ *
+ * Safety check: if the change would leave zero routing-engines in the chassis,
+ * the step is skipped (Juniper Mist requires at least one routing-engine per VC).
+ *
+ * @param {string} siteId
+ * @param {string} deviceId
+ * @returns {{ skipped, oldRole, newRole, message }}
+ */
+async function changeRoleFpc0(siteId, deviceId) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] GET ${url} (changeRoleFpc0 pre-fetch)`);
+  const getRes = await fetch(url, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const text = await getRes.text();
+    throw new Error(`Failed to fetch device config for role change (${getRes.status}): ${text}`);
+  }
+  const config = await getRes.json();
+
+  const currentMembers = config.virtual_chassis && config.virtual_chassis.members;
+  if (!currentMembers || !currentMembers.length) {
+    throw new Error('Cannot change role: virtual_chassis.members not found');
+  }
+
+  const fpc0 = currentMembers.find((m) => m.member_id === 0);
+  if (!fpc0) {
+    throw new Error('Cannot change role: member_id 0 (fpc0) not found in virtual_chassis.members');
+  }
+
+  const oldRole = (fpc0.vc_role || 'linecard').toLowerCase();
+  const newRole = oldRole === 'routing-engine' ? 'linecard' : 'routing-engine';
+
+  // Validate: after the change, at least 1 member must still be routing-engine.
+  const otherRECount = currentMembers.filter(
+    (m) => m.member_id !== 0 && (m.vc_role || '').toLowerCase() === 'routing-engine'
+  ).length;
+  const finalRECount = otherRECount + (newRole === 'routing-engine' ? 1 : 0);
+
+  if (finalRECount < 1) {
+    return {
+      skipped: true,
+      oldRole,
+      newRole,
+      message: `Skipped: changing fpc0 from '${oldRole}' to '${newRole}' would leave no routing-engine in the chassis. At least one member must have the routing-engine role (Juniper Mist requirement).`,
+    };
+  }
+
+  // Build the updated members array — same PUT shape as preprovision / renumber.
+  const updatedMembers = currentMembers.map((m) => ({
+    mac:       normaliseMac(m.mac),
+    vc_role:   m.member_id === 0 ? newRole : ((m.vc_role || 'linecard').toLowerCase()),
+    member_id: m.member_id,
+  }));
+
+  const body = {
+    virtual_chassis: { preprovisioned: true, members: updatedMembers },
+    preprovisioned:  true,
+  };
+
+  console.log(`[Mist] PUT ${url} (changeRoleFpc0 ${oldRole}→${newRole})`, JSON.stringify(body));
+  const putRes = await fetch(url, {
+    method:  'PUT',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!putRes.ok) {
+    const text = await putRes.text();
+    throw new Error(`Mist role change failed (${putRes.status}): ${text}`);
+  }
+
+  const text = await putRes.text();
+  return { skipped: false, oldRole, newRole, result: text ? JSON.parse(text) : { ok: true } };
+}
+
+/**
  * Orchestrate all VC automation steps sequentially.
  * Returns an array of step results: [{ step, ok, message }]
  *
@@ -632,6 +711,27 @@ async function automateVC(siteId, deviceId, members, emit) {
     });
   } catch (err) {
     emit({ step: 'Renumber VC (fpc0 ↔ fpc1)', ok: false, message: err.message });
+    return; // Role change depends on a stable member_id 0 — bail if renumber failed
+  }
+
+  // ── Step 5: Wait 5 minutes after renumber ─────────────────────────────
+  const RENUMBER_WAIT_MS = 5 * 60 * 1000; // 5 minutes
+  emit({ step: 'Waiting for Mist to apply renumber', ok: null, message: 'Waiting 5 minutes after renumber before changing fpc0 role to allow Mist to stabilise the VC…' });
+  await new Promise((resolve) => setTimeout(resolve, RENUMBER_WAIT_MS));
+  emit({ step: 'Waiting for Mist to apply renumber', ok: true, message: 'Wait complete — proceeding to role change' });
+
+  // ── Step 6: Change role of fpc0 ────────────────────────────────────────
+  try {
+    const roleResult = await changeRoleFpc0(siteId, deviceId);
+    emit({
+      step:    'Change Role of fpc0',
+      ok:      true,
+      message: roleResult.skipped
+        ? roleResult.message
+        : `fpc0 role changed from '${roleResult.oldRole}' to '${roleResult.newRole}' successfully.`,
+    });
+  } catch (err) {
+    emit({ step: 'Change Role of fpc0', ok: false, message: err.message });
   }
 
   // Future steps go here
