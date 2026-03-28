@@ -4,10 +4,30 @@ import BouncePortPage from './pages/BouncePortPage.jsx';
 import VirtualChassisPage from './pages/VirtualChassisPage.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
+const VALID_PAGES = ['dashboard', 'bounce-port', 'virtual-chassis'];
+
+function pageFromHash() {
+  const hash = window.location.hash.replace('#', '');
+  return VALID_PAGES.includes(hash) ? hash : 'dashboard';
+}
+
 export default function App() {
   const [dark,         setDark]         = useState(() => localStorage.getItem('theme') === 'dark');
-  const [page,         setPage]         = useState('dashboard');
+  const [page,         setPage]         = useState(pageFromHash);
   const [bounceActive, setBounceActive] = useState(false);
+
+  // Keep URL hash in sync when page changes
+  function navigateTo(p) {
+    window.location.hash = p;
+    setPage(p);
+  }
+
+  // Handle browser back/forward
+  useEffect(() => {
+    function onHashChange() { setPage(pageFromHash()); }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -22,7 +42,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-950">
-      <Sidebar dark={dark} onToggleDark={() => setDark((d) => !d)} activePage={page} onNavigate={setPage} bounceActive={bounceActive} />
+      <Sidebar dark={dark} onToggleDark={() => setDark((d) => !d)} activePage={page} onNavigate={navigateTo} bounceActive={bounceActive} />
       <main className="flex-1 overflow-y-auto p-8">
         {/* Both pages stay mounted so bounce intervals survive navigation */}
         <div className={page !== 'dashboard'        ? 'hidden' : ''}><Dashboard /></div>
