@@ -23,7 +23,7 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
     backfaceVisibility: 'hidden',
     WebkitBackfaceVisibility: 'hidden',
     borderRadius: '1rem',
-    padding: '1.5rem',
+    padding: '1.75rem',
     display: 'flex',
     flexDirection: 'column',
   };
@@ -32,7 +32,7 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
     <div
       style={{
         perspective: '1000px',
-        height: '160px',
+        height: '176px',
         // Spring easing (0.34, 1.56, 0.64, 1) overshoots slightly → natural bounce
         transform: flipped ? 'translateY(-10px) scale(1.05)' : 'translateY(0px) scale(1)',
         transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -55,10 +55,10 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
           className="dark:!bg-amber-50"
           style={{ ...faceBase, backgroundColor: 'white', border: '1px solid #f3f4f6' }}
         >
-          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
+          <p style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
             {title}
           </p>
-          <span style={{ marginTop: 'auto', fontSize: '0.75rem', fontWeight: 500, color: '#9ca3af' }}>
+          <span style={{ marginTop: 'auto', fontSize: '0.82rem', fontWeight: 500, color: '#9ca3af' }}>
             Hover to preview →
           </span>
         </div>
@@ -73,18 +73,18 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
             cursor: 'pointer',
           }}
         >
-          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+          <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
             {backHeader}
           </p>
-          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
             {backItems.map((item) => (
-              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>
+              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>
                 <span style={{ color: '#a5f3fc', flexShrink: 0 }}>✓</span>
                 {item}
               </li>
             ))}
           </ul>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Let's automate →
           </span>
         </div>
