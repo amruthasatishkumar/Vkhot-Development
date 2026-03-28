@@ -429,7 +429,10 @@ const VC_ROLE_MAP = {
 async function preprovisionVC(siteId, deviceId, members) {
   await validateToken();
 
-  // Sort: routing-engine first (master then backup), then linecards
+  // Sort: prefer existing master/backup/routing-engine first, then linecards/unknown.
+  // Role is then assigned purely by position (idx 0 and 1 → routing-engine, rest → linecard)
+  // so that a 2-member VC always gets two routing-engines, and a 3+ member VC gets
+  // routing-engine for fpc0 & fpc1 and linecard for fpc2+.
   const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
   const sorted = [...members].sort(
     (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
@@ -437,7 +440,7 @@ async function preprovisionVC(siteId, deviceId, members) {
 
   const vcMembers = sorted.map((m, idx) => ({
     mac:       normaliseMac(m.mac),
-    vc_role:   VC_ROLE_MAP[m.vc_role] || 'linecard',
+    vc_role:   idx < 2 ? 'routing-engine' : 'linecard',
     member_id: idx,
   }));
 
