@@ -242,7 +242,7 @@ function RunsInProgress({ runs, onNavigate }) {
           </span>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="flex gap-8 flex-wrap">
         {RUN_SLOTS.map((slot) => {
           const run  = runs.find((r) => r.key === slot.key);
           const live = Boolean(run);
@@ -251,38 +251,23 @@ function RunsInProgress({ runs, onNavigate }) {
               key={slot.key}
               type="button"
               onClick={() => onNavigate(slot.page)}
-              className={`group w-full text-left rounded-2xl border shadow-sm transition-all duration-200 p-5 flex items-center gap-5
-                ${ live
-                  ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-600'
-                  : 'bg-gray-50 dark:bg-gray-800/50 border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
+              className="group flex flex-col items-center gap-2 transition-opacity duration-200 hover:opacity-80 bg-transparent border-none p-0"
             >
-              <div className="flex-shrink-0">
-                {live
-                  ? <DonutChart pct={run.pct} color={run.color} trackColor={run.track} />
-                  : <DonutChart pct={0} color={slot.idleColor} trackColor={slot.idleTrack} idle />
-                }
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-base font-extrabold tracking-tight ${ live ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500' }`}>
-                  {slot.label}
-                </p>
-                {live ? (
-                  <>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate">{run.sub}</p>
-                    <div className="mt-3 flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: run.color }} />
-                      <p className="text-xs font-semibold" style={{ color: run.color }}>{run.detail}</p>
-                    </div>
-                    <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 group-hover:text-indigo-500 transition-colors">Click to view →</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Not running</p>
-                    <p className="mt-3 text-xs text-gray-300 dark:text-gray-600 group-hover:text-indigo-400 transition-colors">Click to start →</p>
-                  </>
-                )}
-              </div>
+              {live
+                ? <DonutChart pct={run.pct} color={run.color} trackColor={run.track} />
+                : <DonutChart pct={0} color={slot.idleColor} trackColor={slot.idleTrack} idle />
+              }
+              <p className={`text-xs font-bold tracking-tight text-center ${ live ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500' }`}>
+                {slot.label}
+              </p>
+              {live ? (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center truncate max-w-[120px]">{run.sub}</p>
+                  <p className="text-xs font-semibold text-center" style={{ color: run.color }}>{run.detail}</p>
+                </>
+              ) : (
+                <p className="text-xs text-gray-300 dark:text-gray-600 text-center">Not running</p>
+              )}
             </button>
           );
         })}
