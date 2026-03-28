@@ -72,15 +72,17 @@ function VCAutomationView({ vc, onBack }) {
     try { return JSON.parse(sessionStorage.getItem('vc:steps')) || []; } catch { return []; }
   });
   const [ran,         setRan]         = useState(() => sessionStorage.getItem('vc:ran') === 'true');
+  const [completed,   setCompleted]   = useState(() => sessionStorage.getItem('vc:completed') === 'true');
   const [members,     setMembers]     = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('vc:members')) || vc.members; } catch { return vc.members; }
   });
   const [refreshing,  setRefreshing]  = useState(false);
   const [refreshErr,  setRefreshErr]  = useState('');
 
-  useEffect(() => { sessionStorage.setItem('vc:steps',   JSON.stringify(steps));      }, [steps]);
-  useEffect(() => { sessionStorage.setItem('vc:ran',     ran ? 'true' : 'false');     }, [ran]);
-  useEffect(() => { sessionStorage.setItem('vc:members', JSON.stringify(members));    }, [members]);
+  useEffect(() => { sessionStorage.setItem('vc:steps',     JSON.stringify(steps));           }, [steps]);
+  useEffect(() => { sessionStorage.setItem('vc:ran',       ran       ? 'true' : 'false'); }, [ran]);
+  useEffect(() => { sessionStorage.setItem('vc:completed', completed ? 'true' : 'false'); }, [completed]);
+  useEffect(() => { sessionStorage.setItem('vc:members',   JSON.stringify(members));          }, [members]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -101,6 +103,7 @@ function VCAutomationView({ vc, onBack }) {
 
   async function handleStart() {
     setAutomating(true);
+    setCompleted(false);
     setRan(true);
     setSteps([]);
     try {
@@ -149,19 +152,23 @@ function VCAutomationView({ vc, onBack }) {
     } catch {
       setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);
     } finally {
+      setCompleted(true);
       setAutomating(false);
     }
   }
 
-  const allPassed = ran && !automating && steps.length > 0 && steps.every((s) => s.ok === true);
-  const anyFailed = ran && !automating && steps.some((s) => s.ok === false);
+  const allPassed = ran && completed && steps.length > 0 && steps.every((s) => s.ok === true);
+  const anyFailed = ran && completed && steps.some((s) => s.ok === false);
+  // Show back/run-again only before any run, or once fully completed.
+  // While in progress (ran=true, completed=false), both are hidden.
+  const isDone = !ran || completed;
 
   return (
     <div className="space-y-6 max-w-3xl">
 
       {/* Banner with back */}
       <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
-        {(!ran || (ran && !automating)) && (
+        {isDone && (
           <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-2 transition-colors">
             ← Back to Virtual Chassis list
           </button>
@@ -223,7 +230,7 @@ function VCAutomationView({ vc, onBack }) {
               Runs each automation step sequentially and reports the result.
             </p>
           </div>
-          {!automating && (
+          {isDone && (
             <button
               type="button"
               onClick={handleStart}
@@ -231,7 +238,7 @@ function VCAutomationView({ vc, onBack }) {
               {ran ? '🔄 Run Again' : '🚀 Start VC Automation'}
             </button>
           )}
-          {automating && (
+          {!isDone && (
             <span className="px-6 py-2.5 text-sm font-semibold text-gray-400 dark:text-gray-500">
               ⏳ Running…
             </span>
@@ -354,6 +361,7 @@ export default function VirtualChassisPage() {
     // Reset persisted automation state for the new VC
     sessionStorage.removeItem('vc:steps');
     sessionStorage.removeItem('vc:ran');
+    sessionStorage.removeItem('vc:completed');
     sessionStorage.removeItem('vc:members');
     setActiveVc(vc);
   }
@@ -362,6 +370,7 @@ export default function VirtualChassisPage() {
     sessionStorage.removeItem('vc:activeVc');
     sessionStorage.removeItem('vc:steps');
     sessionStorage.removeItem('vc:ran');
+    sessionStorage.removeItem('vc:completed');
     sessionStorage.removeItem('vc:members');
     setActiveVc(null);
   }
