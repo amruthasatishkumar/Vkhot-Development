@@ -1,10 +1,9 @@
 import { useState } from 'react';
 
 const NETWORKS_BACK_ITEMS = [
-  'Create bulk VLANs across your org',
-  'Build and assign Port Profiles',
-  'Assign profiles to switch down-ports',
-  'Remove app-created VLANs & profiles',
+  'Bulk Networks',
+  'Port Profiles',
+  'Port Profile Assignment',
 ];
 
 function FlipCard({ title, backItems, onClick }) {
@@ -65,19 +64,19 @@ function FlipCard({ title, backItems, onClick }) {
             cursor: 'pointer',
           }}
         >
-          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
-            What you can do
+          <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            Here you can create:
           </p>
-          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {backItems.map((item) => (
-              <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
-                <span style={{ color: '#a5f3fc', marginTop: '1px', flexShrink: 0 }}>✓</span>
+              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', fontWeight: 700, color: 'white', lineHeight: 1.4 }}>
+                <span style={{ color: '#a5f3fc', flexShrink: 0 }}>✓</span>
                 {item}
               </li>
             ))}
           </ul>
-          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginTop: '0.5rem' }}>
-            Click to open →
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            Let's automate →
           </span>
         </div>
 
