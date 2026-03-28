@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // ── Spinner ───────────────────────────────────────────────────────────────────
 function Spinner() {
@@ -293,8 +293,257 @@ function NetworksTab({ templateId }) {
   );
 }
 
+// ── Port Profiles tab ─────────────────────────────────────────────────────────
+function PortProfilesTab({ templateId }) {
+  const [networks,    setNetworks]    = useState([]);
+  const [loadingNets, setLoadingNets] = useState(false);
+  const [netError,    setNetError]    = useState('');
+
+  const [count,       setCount]       = useState('');
+  const [countErr,    setCountErr]    = useState('');
+  const [mode,        setMode]        = useState('access');
+  const [portNetwork, setPortNetwork] = useState('');
+  const [voipNetwork, setVoipNetwork] = useState('');
+  const [selectErr,   setSelectErr]   = useState('');
+
+  const [generated,   setGenerated]   = useState([]);
+  const [creating,    setCreating]    = useState(false);
+  const [success,     setSuccess]     = useState(null);
+  const [apiError,    setApiError]    = useState('');
+
+  useEffect(() => {
+    async function load() {
+      setLoadingNets(true);
+      try {
+        const res  = await fetch(`/api/switch-templates/${templateId}/networks`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load networks.');
+        setNetworks(data.networks || []);
+      } catch (err) {
+        setNetError(err.message);
+      } finally {
+        setLoadingNets(false);
+      }
+    }
+    load();
+  }, [templateId]);
+
+  function generateProfiles(n) {
+    const usedIds = new Set();
+    const list    = [];
+    for (let i = 0; i < n; i++) {
+      let id;
+      do { id = Math.floor(Math.random() * 900) + 100; } // 100–999
+      while (usedIds.has(id));
+      usedIds.add(id);
+      list.push({ name: `PROFILE_${id}`, mode, port_network: portNetwork, voip_network: voipNetwork });
+    }
+    return list;
+  }
+
+  function handleGenerate() {
+    setCountErr(''); setSelectErr(''); setSuccess(null); setApiError('');
+    const n = parseInt(count, 10);
+    if (!count || isNaN(n) || n < 1) { setCountErr('Enter a number greater than 0.'); return; }
+    if (!portNetwork)                 { setSelectErr('Select a Port Network (untagged/native VLAN).'); return; }
+    if (!voipNetwork)                 { setSelectErr('Select a VoIP Network.'); return; }
+    if (portNetwork === voipNetwork)  { setSelectErr('Port Network and VoIP Network must be different.'); return; }
+    setGenerated(generateProfiles(n));
+  }
+
+  async function handleCreateProfiles() {
+    setCreating(true); setApiError(''); setSuccess(null);
+    try {
+      const res = await fetch(`/api/switch-templates/${templateId}/port-profiles`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ profiles: generated }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create port profiles.');
+      setSuccess({ count: generated.length, names: generated.map((p) => p.name) });
+      setGenerated([]); setCount('');
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (loadingNets) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+        <Spinner /> Loading networks…
+      </div>
+    );
+  }
+  if (netError) {
+    return <p className="text-sm text-red-500">{netError}</p>;
+  }
+  if (networks.length < 2) {
+    return (
+      <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3">
+        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">⚠️ At least 2 networks required</p>
+        <p className="text-sm text-amber-600 dark:text-amber-300 mt-0.5">
+          Add networks to this template in the Networks tab first before creating port profiles.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Config grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        {/* Mode */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mode</label>
+          <div className="flex gap-3">
+            {['access', 'trunk'].map((m) => (
+              <button key={m} type="button"
+                onClick={() => { setMode(m); setGenerated([]); setSuccess(null); }}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors capitalize ${
+                  mode === m
+                    ? 'bg-teal-600 border-teal-600 text-white'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-teal-400 dark:hover:border-teal-500 bg-white dark:bg-gray-700'
+                }`}>
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Count */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            How many profiles to create?
+          </label>
+          <input type="number" min={1} value={count}
+            onChange={(e) => { setCount(e.target.value); setCountErr(''); setGenerated([]); setSuccess(null); }}
+            placeholder="e.g. 10"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+          {countErr && <p className="mt-1 text-xs text-red-500">{countErr}</p>}
+        </div>
+
+        {/* Port Network */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Port Network <span className="text-gray-400 font-normal">(Untagged / Native VLAN)</span>
+          </label>
+          <select value={portNetwork}
+            onChange={(e) => { setPortNetwork(e.target.value); setSelectErr(''); setGenerated([]); setSuccess(null); }}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <option value="">Select network…</option>
+            {networks.filter((n) => n.name !== voipNetwork).map((n) => (
+              <option key={n.name} value={n.name}>{n.name} (VLAN {n.vlan_id})</option>
+            ))}
+          </select>
+        </div>
+
+        {/* VoIP Network */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            VoIP Network
+          </label>
+          <select value={voipNetwork}
+            onChange={(e) => { setVoipNetwork(e.target.value); setSelectErr(''); setGenerated([]); setSuccess(null); }}
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <option value="">Select network…</option>
+            {networks.filter((n) => n.name !== portNetwork).map((n) => (
+              <option key={n.name} value={n.name}>{n.name} (VLAN {n.vlan_id})</option>
+            ))}
+          </select>
+        </div>
+
+      </div>
+
+      {selectErr && <p className="text-xs text-red-500">{selectErr}</p>}
+
+      <button type="button" onClick={handleGenerate}
+        className="rounded-lg bg-gray-800 dark:bg-gray-600 hover:bg-gray-700 dark:hover:bg-gray-500 text-white text-sm font-medium px-4 py-2 transition-colors">
+        🎲 Generate Profiles
+      </button>
+
+      {/* Preview table */}
+      {generated.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              Preview — {generated.length} profile{generated.length > 1 ? 's' : ''}
+            </p>
+            <button type="button" onClick={handleGenerate}
+              className="text-xs text-teal-600 dark:text-teal-400 hover:underline">↺ Regenerate</button>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                  {['Profile Name', 'Mode', 'Port Network', 'VoIP Network'].map((h) => (
+                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {generated.map((p) => (
+                  <tr key={p.name} className="bg-white dark:bg-gray-800">
+                    <td className="px-4 py-2 font-mono text-xs text-gray-800 dark:text-gray-100">{p.name}</td>
+                    <td className="px-4 py-2 text-xs">
+                      <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                        p.mode === 'trunk'
+                          ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                          : 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
+                      }`}>
+                        {p.mode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.port_network}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.voip_network}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" onClick={handleCreateProfiles} disabled={creating}
+            className="inline-flex items-center gap-2 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 transition-colors">
+            {creating
+              ? (<><Spinner /> Creating…</>)
+              : `Create ${generated.length} Profile${generated.length > 1 ? 's' : ''} in Template`}
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-3">
+          <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+            ✅ {success.count} port profile{success.count > 1 ? 's' : ''} added to template
+          </p>
+          <p className="text-xs text-green-600 dark:text-green-300 mt-1 font-mono break-all">
+            {success.names.join(', ')}
+          </p>
+        </div>
+      )}
+
+      {apiError && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-3">
+          <p className="text-sm font-semibold text-red-700 dark:text-red-400">❌ Error</p>
+          <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{apiError}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Template detail view ──────────────────────────────────────────────────────
 function TemplateDetailView({ template, onBack }) {
+  const [activeTab, setActiveTab] = useState('networks');
+
+  const tabs = [
+    { key: 'networks',      label: 'Networks' },
+    { key: 'port-profiles', label: 'Port Profiles' },
+  ];
+
   return (
     <div className="space-y-6 max-w-3xl">
 
@@ -319,13 +568,44 @@ function TemplateDetailView({ template, onBack }) {
         </dl>
       </div>
 
-      {/* Networks */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Networks</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Randomly generate VLAN networks and push them into this template.
-        </p>
-        <NetworksTab templateId={template.id} />
+      {/* Tab card */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          {tabs.map((tab) => (
+            <button key={tab.key} type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === tab.key
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="p-6">
+          {activeTab === 'networks' && (
+            <>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                Randomly generate VLAN networks and push them into this template.
+              </p>
+              <NetworksTab templateId={template.id} />
+            </>
+          )}
+          {activeTab === 'port-profiles' && (
+            <>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                Create bulk port profiles using networks already on this template.
+              </p>
+              <PortProfilesTab templateId={template.id} />
+            </>
+          )}
+        </div>
+
       </div>
 
     </div>

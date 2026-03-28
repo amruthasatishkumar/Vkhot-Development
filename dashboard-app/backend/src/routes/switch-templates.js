@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate } = require('../services/mist');
+const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate, updateOrgNetworkTemplatePortProfiles } = require('../services/mist');
 
 const router = express.Router();
 
@@ -93,6 +93,51 @@ router.delete('/:id', async (req, res) => {
   try {
     await deleteOrgNetworkTemplate(process.env.MIST_ORG_ID, id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
+// GET /api/switch-templates/:id/port-profiles
+// Returns the template's port_usages as an array.
+router.get('/:id/port-profiles', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const template = await getOrgNetworkTemplate(process.env.MIST_ORG_ID, id);
+    const profiles = Object.entries(template.port_usages || {}).map(([name, v]) => ({
+      name, mode: v.mode, port_network: v.port_network, voip_network: v.voip_network,
+    }));
+    res.json({ profiles });
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
+// PUT /api/switch-templates/:id/port-profiles
+// Body: { profiles: [{ name, mode, port_network, voip_network }] }
+// Merges port profiles into the template's port_usages.
+router.put('/:id/port-profiles', async (req, res) => {
+  const { id } = req.params;
+  const { profiles } = req.body;
+
+  if (!Array.isArray(profiles) || profiles.length === 0) {
+    return res.status(400).json({ error: 'profiles must be a non-empty array.' });
+  }
+
+  const profilesMap = {};
+  for (const p of profiles) {
+    if (!p.name || !p.mode || !p.port_network || !p.voip_network) {
+      return res.status(400).json({ error: 'Each profile must have name, mode, port_network, and voip_network.' });
+    }
+    if (!['trunk', 'access'].includes(p.mode)) {
+      return res.status(400).json({ error: 'mode must be trunk or access.' });
+    }
+    profilesMap[p.name] = { mode: p.mode, port_network: p.port_network, voip_network: p.voip_network };
+  }
+
+  try {
+    const result = await updateOrgNetworkTemplatePortProfiles(process.env.MIST_ORG_ID, id, profilesMap);
+    res.json(result);
   } catch (err) {
     res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
   }
