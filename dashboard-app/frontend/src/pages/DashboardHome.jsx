@@ -6,7 +6,17 @@ const NETWORKS_BACK_ITEMS = [
   'Port Profile Assignment',
 ];
 
-function FlipCard({ title, backItems, onClick }) {
+const BOUNCE_BACK_ITEMS = [
+  'For any specific time you want',
+];
+
+const VC_BACK_ITEMS = [
+  'Preprovision Virtual Chassis',
+  'Renumber VC members (fpc0 ↔ fpc1)',
+  'Change member roles',
+];
+
+function FlipCard({ title, backHeader, backItems, onClick }) {
   const [flipped, setFlipped] = useState(false);
 
   const faceBase = {
@@ -65,7 +75,7 @@ function FlipCard({ title, backItems, onClick }) {
           }}
         >
           <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
-            Here you can create Bulk
+            {backHeader}
           </p>
           <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {backItems.map((item) => (
@@ -121,11 +131,22 @@ export default function DashboardHome({ onNavigate }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <FlipCard
           title="Networks & Port Profiles"
+          backHeader="Here you can create Bulk"
           backItems={NETWORKS_BACK_ITEMS}
           onClick={() => onNavigate('networks')}
         />
-        <PlainCard title="Bounce Ports"    onClick={() => onNavigate('bounce-port')} />
-        <PlainCard title="Virtual Chassis" onClick={() => onNavigate('virtual-chassis')} />
+        <FlipCard
+          title="Bounce Ports"
+          backHeader="Here you can Bounce multiple ports at once"
+          backItems={BOUNCE_BACK_ITEMS}
+          onClick={() => onNavigate('bounce-port')}
+        />
+        <FlipCard
+          title="Virtual Chassis"
+          backHeader="Here you can Automate Virtual Chassis"
+          backItems={VC_BACK_ITEMS}
+          onClick={() => onNavigate('virtual-chassis')}
+        />
       </div>
 
     </div>
