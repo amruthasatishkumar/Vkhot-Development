@@ -47,8 +47,8 @@ function NetworksTab({ templateId }) {
   function handleGenerate() {
     setCountErr(''); setSuccess(null); setApiError('');
     const n = parseInt(count, 10);
-    if (!count || isNaN(n) || n < 1 || n > 20) {
-      setCountErr('Enter a number between 1 and 20.');
+    if (!count || isNaN(n) || n < 1 || n > 4000) {
+      setCountErr('Enter a number between 1 and 4000.');
       return;
     }
     setGenerated(generateNetworks(n));
@@ -82,9 +82,9 @@ function NetworksTab({ templateId }) {
             How many networks to create?
           </label>
           <input
-            type="number" min={1} max={20} value={count}
+            type="number" min={1} max={4000} value={count}
             onChange={(e) => { setCount(e.target.value); setCountErr(''); setSuccess(null); setGenerated([]); }}
-            placeholder="1 – 20"
+            placeholder="1 – 4000"
             className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           {countErr && <p className="mt-1 text-xs text-red-500">{countErr}</p>}
@@ -177,21 +177,11 @@ function TemplateDetailView({ template, onBack }) {
       {/* Template info */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Template Details</h2>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+        <dl className="text-sm">
           <div>
             <dt className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Name</dt>
             <dd className="font-semibold text-gray-800 dark:text-gray-100">{template.name}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">Template ID</dt>
-            <dd className="font-mono text-xs text-gray-600 dark:text-gray-300 break-all">{template.id}</dd>
-          </div>
-          {template._apiEndpoint && (
-            <div className="sm:col-span-2">
-              <dt className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-0.5">API Endpoint</dt>
-              <dd className="font-mono text-xs text-teal-700 dark:text-teal-400 break-all">{template._apiEndpoint}</dd>
-            </div>
-          )}
         </dl>
       </div>
 
@@ -209,7 +199,7 @@ function TemplateDetailView({ template, onBack }) {
 }
 
 // ── Create form view ──────────────────────────────────────────────────────────
-function CreateTemplateView({ savedTemplate, onCreated, onSelectTemplate }) {
+function CreateTemplateView({ savedTemplates, onCreated, onSelectTemplate }) {
   const [name,     setName]     = useState('');
   const [nameErr,  setNameErr]  = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -284,24 +274,28 @@ function CreateTemplateView({ savedTemplate, onCreated, onSelectTemplate }) {
         )}
       </div>
 
-      {/* Previously created template — click to open */}
-      {savedTemplate && (
+      {/* Previously created templates — click any to open */}
+      {savedTemplates.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-            Your Template
+            Your Templates ({savedTemplates.length})
           </p>
-          <button type="button" onClick={() => onSelectTemplate(savedTemplate)}
-            className="w-full text-left rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-teal-400 dark:hover:border-teal-500 hover:shadow-md shadow-sm transition-all px-5 py-4 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-                  {savedTemplate.name}
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{savedTemplate.id}</p>
-              </div>
-              <span className="text-gray-300 dark:text-gray-600 group-hover:text-teal-500 transition-colors text-lg">→</span>
-            </div>
-          </button>
+          <div className="space-y-2">
+            {savedTemplates.map((t) => (
+              <button key={t.id} type="button" onClick={() => onSelectTemplate(t)}
+                className="w-full text-left rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-teal-400 dark:hover:border-teal-500 hover:shadow-md shadow-sm transition-all px-5 py-4 group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                      {t.name}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{t.id}</p>
+                  </div>
+                  <span className="text-gray-300 dark:text-gray-600 group-hover:text-teal-500 transition-colors text-lg">→</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -311,14 +305,16 @@ function CreateTemplateView({ savedTemplate, onCreated, onSelectTemplate }) {
 
 // ── Root — toggles between create and detail view ────────────────────────────
 export default function SwitchTemplatePage() {
-  const [savedTemplate, setSavedTemplate] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('st:template')); } catch { return null; }
+  const [savedTemplates, setSavedTemplates] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('st:templates')) || []; } catch { return []; }
   });
   const [activeTemplate, setActiveTemplate] = useState(null);
 
   function handleCreated(template) {
-    sessionStorage.setItem('st:template', JSON.stringify(template));
-    setSavedTemplate(template);
+    // Add to front of list, deduplicate by id
+    const updated = [template, ...savedTemplates.filter((t) => t.id !== template.id)];
+    sessionStorage.setItem('st:templates', JSON.stringify(updated));
+    setSavedTemplates(updated);
     setActiveTemplate(template);
   }
 
@@ -327,7 +323,7 @@ export default function SwitchTemplatePage() {
   }
   return (
     <CreateTemplateView
-      savedTemplate={savedTemplate}
+      savedTemplates={savedTemplates}
       onCreated={handleCreated}
       onSelectTemplate={setActiveTemplate}
     />

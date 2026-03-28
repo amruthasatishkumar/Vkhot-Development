@@ -41,8 +41,8 @@ router.put('/:id/networks', async (req, res) => {
   if (!Array.isArray(networks) || networks.length === 0) {
     return res.status(400).json({ error: 'networks must be a non-empty array.' });
   }
-  if (networks.length > 20) {
-    return res.status(400).json({ error: 'Cannot create more than 20 networks at once.' });
+  if (networks.length > 4000) {
+    return res.status(400).json({ error: 'Cannot create more than 4000 networks at once.' });
   }
 
   const networksMap = {};
