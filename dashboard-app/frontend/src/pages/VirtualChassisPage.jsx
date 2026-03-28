@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const ROLE_BADGE = {
   master:   'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-700',
@@ -78,6 +78,7 @@ function VCAutomationView({ vc, onBack }) {
   });
   const [refreshing,  setRefreshing]  = useState(false);
   const [refreshErr,  setRefreshErr]  = useState('');
+  const abortRef = useRef(null);
 
   useEffect(() => { sessionStorage.setItem('vc:steps',     JSON.stringify(steps));           }, [steps]);
   useEffect(() => { sessionStorage.setItem('vc:ran',       ran       ? 'true' : 'false'); }, [ran]);
@@ -101,7 +102,13 @@ function VCAutomationView({ vc, onBack }) {
     }
   }
 
+  function handleStop() {
+    if (abortRef.current) abortRef.current.abort();
+  }
+
   async function handleStart() {
+    const controller = new AbortController();
+    abortRef.current = controller;
     setAutomating(true);
     setCompleted(false);
     setRan(true);
@@ -110,6 +117,7 @@ function VCAutomationView({ vc, onBack }) {
       const res = await fetch('/api/networks/vc-automate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal:  controller.signal,
         body:    JSON.stringify({
           site_id:   vc.site_id,
           device_id: vc.device_id,
@@ -149,8 +157,12 @@ function VCAutomationView({ vc, onBack }) {
           } catch { /* ignore malformed line */ }
         }
       }
-    } catch {
-      setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setSteps((prev) => [...prev, { step: 'Stopped', ok: false, message: 'Automation was stopped by user.' }]);
+      } else {
+        setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);
+      }
     } finally {
       setCompleted(true);
       setAutomating(false);
@@ -239,9 +251,15 @@ function VCAutomationView({ vc, onBack }) {
             </button>
           )}
           {!isDone && (
-            <span className="px-6 py-2.5 text-sm font-semibold text-gray-400 dark:text-gray-500">
-              ⏳ Running…
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-gray-400 dark:text-gray-500">⏳ Running…</span>
+              <button
+                type="button"
+                onClick={handleStop}
+                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors">
+                ⛔ Stop
+              </button>
+            </div>
           )}
         </div>
 
