@@ -45,8 +45,6 @@ function MemberTable({ members }) {
 }
 
 // ── Step log row ──────────────────────────────────────────────────────────────
-// step = { step: string, ok: true | false | null, message: string }
-// ok=null means running
 function StepRow({ step }) {
   const icon = step.ok === null
     ? <span className="animate-spin inline-block h-4 w-4 border-2 border-brand-500 border-t-transparent rounded-full" />
@@ -55,7 +53,7 @@ function StepRow({ step }) {
       : <span className="text-red-400 text-base leading-none">❌</span>;
 
   return (
-    <div className="flex items-start gap-3 py-2.5 px-4 border-b border-gray-100 dark:border-gray-700 last:border-0">
+    <div className="flex items-start gap-3 py-3 px-5 border-b border-gray-100 dark:border-gray-700 last:border-0">
       <div className="mt-0.5 flex-shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{step.step}</p>
@@ -67,21 +65,135 @@ function StepRow({ step }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
-export default function VirtualChassisPage() {
+// ── VC Automation Page (detail + runner) ──────────────────────────────────────
+function VCAutomationView({ vc, onBack }) {
+  const [automating, setAutomating] = useState(false);
+  const [steps,      setSteps]      = useState([]);
+  const [ran,        setRan]        = useState(false);
+
+  async function handleStart() {
+    setAutomating(true);
+    setRan(true);
+    setSteps([
+      { step: 'Fetch Device Config', ok: null, message: 'Running…' },
+      { step: 'Preprovision VC',     ok: null, message: 'Pending…' },
+    ]);
+    try {
+      const res  = await fetch('/api/networks/vc-automate', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          site_id:   vc.site_id,
+          device_id: vc.device_id,
+          vc_mac:    vc.vc_mac,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSteps([{ step: 'Automation', ok: false, message: data.error || 'Automation failed.' }]);
+      } else {
+        setSteps(data.steps);
+      }
+    } catch {
+      setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);
+    } finally {
+      setAutomating(false);
+    }
+  }
+
+  const allPassed = ran && !automating && steps.length > 0 && steps.every((s) => s.ok === true);
+  const anyFailed = ran && !automating && steps.some((s) => s.ok === false);
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+
+      {/* Banner with back */}
+      <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-2 transition-colors">
+          ← Back to Virtual Chassis list
+        </button>
+        <p className="text-lg font-bold text-white tracking-tight">🔗 {vc.name}</p>
+        <p className="text-sm text-indigo-100 mt-0.5">Virtual Chassis Automation</p>
+      </div>
+
+      {/* VC detail card */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Device Details</h2>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Name</p>
+            <p className="font-semibold text-gray-800 dark:text-gray-100">{vc.name}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Virtual MAC</p>
+            <p className="font-mono text-gray-700 dark:text-gray-300">{vc.vc_mac}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Members</p>
+            <p className="font-semibold text-gray-800 dark:text-gray-100">{vc.members.length}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Site ID</p>
+            <p className="font-mono text-xs text-gray-600 dark:text-gray-300 break-all">{vc.site_id}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Members table */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Members</p>
+        </div>
+        <MemberTable members={vc.members} />
+      </div>
+
+      {/* Automation launcher */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
+          <div>
+            <p className="text-base font-semibold text-gray-800 dark:text-gray-100">VC Automation</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Runs each automation step sequentially and reports the result.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={automating}
+            className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
+            {automating ? '⏳ Running…' : ran ? '🔄 Run Again' : '🚀 Start VC Automation'}
+          </button>
+        </div>
+
+        {/* Step log */}
+        {steps.length > 0 && (
+          <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="px-5 py-2.5 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Results</p>
+              {allPassed && <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">All steps passed</span>}
+              {anyFailed && <span className="ml-auto text-xs font-semibold text-red-500 dark:text-red-400">Some steps failed</span>}
+            </div>
+            {steps.map((s, i) => <StepRow key={i} step={s} />)}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+// ── VC List View ──────────────────────────────────────────────────────────────
+function VCListView({ onStart }) {
   const [loading,    setLoading]    = useState(false);
   const [apiError,   setApiError]   = useState('');
   const [vcs,        setVcs]        = useState(null);
   const [selectedVc, setSelectedVc] = useState(null);
-  const [automating, setAutomating] = useState(false);
-  const [steps,      setSteps]      = useState([]);
 
   async function loadVCs() {
     setLoading(true);
     setApiError('');
     setVcs(null);
     setSelectedVc(null);
-    setSteps([]);
     try {
       const res  = await fetch('/api/networks/virtual-chassis');
       const data = await res.json();
@@ -95,36 +207,7 @@ export default function VirtualChassisPage() {
   }
 
   function selectVc(vc) {
-    // Clicking the already-selected card deselects it
     setSelectedVc((prev) => prev?.vc_mac === vc.vc_mac ? null : vc);
-    setSteps([]);
-  }
-
-  async function handleStartAutomation() {
-    setAutomating(true);
-    // Show pending state immediately
-    setSteps([{ step: 'Preprovision VC', ok: null, message: 'Running…' }]);
-    try {
-      const res  = await fetch('/api/networks/vc-automate', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          site_id:   selectedVc.site_id,
-          device_id: selectedVc.device_id,
-          vc_mac:    selectedVc.vc_mac,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setSteps([{ step: 'Preprovision VC', ok: false, message: data.error || 'Automation failed.' }]);
-      } else {
-        setSteps(data.steps);
-      }
-    } catch {
-      setSteps([{ step: 'Preprovision VC', ok: false, message: 'Could not reach backend.' }]);
-    } finally {
-      setAutomating(false);
-    }
   }
 
   return (
@@ -136,11 +219,11 @@ export default function VirtualChassisPage() {
         <p className="text-sm text-indigo-100 mt-0.5">Automate Virtual Chassis provisioning on staging devices.</p>
       </div>
 
-      {/* Discover section */}
+      {/* Discover */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Discover Virtual Chassis</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Scan your org inventory, then click a VC card to select it and run the automation.
+          Scan your org inventory, then click a VC card to select it.
         </p>
         <button type="button" onClick={loadVCs} disabled={loading}
           className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -148,61 +231,39 @@ export default function VirtualChassisPage() {
         </button>
       </div>
 
-      {/* Error */}
       {apiError && (
         <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-700 dark:text-red-400">
           <strong>Error:</strong> {apiError}
         </div>
       )}
 
-      {/* No VC found */}
       {vcs !== null && vcs.length === 0 && (
         <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 px-5 py-4 text-sm text-yellow-700 dark:text-yellow-400">
           No Virtual Chassis devices found in your org inventory.
         </div>
       )}
 
-      {/* VC list */}
       {vcs !== null && vcs.length > 0 && (
         <div className="space-y-4">
           <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
             {vcs.length} Virtual Chassis found — click a card to select
           </p>
 
-          {/* Automation launcher — visible when a VC is selected */}
+          {/* Start button — appears when a VC is selected */}
           {selectedVc && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-brand-500 shadow-sm p-5">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Selected: <span className="text-brand-600 dark:text-brand-400">{selectedVc.name}</span>
-                  </p>
-                  <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">{selectedVc.vc_mac}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleStartAutomation}
-                  disabled={automating}
-                  className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
-                  {automating ? '⏳ Running…' : '🚀 Start VC Automation'}
-                </button>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-brand-500 shadow-sm p-5 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  Selected: <span className="text-brand-600 dark:text-brand-400">{selectedVc.name}</span>
+                </p>
+                <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">{selectedVc.vc_mac}</p>
               </div>
-            </div>
-          )}
-
-          {/* Step results log */}
-          {steps.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Automation Results</p>
-                {!automating && steps.every((s) => s.ok) && (
-                  <span className="text-xs font-semibold text-green-600 dark:text-green-400 ml-auto">All steps passed</span>
-                )}
-                {!automating && steps.some((s) => s.ok === false) && (
-                  <span className="text-xs font-semibold text-red-500 dark:text-red-400 ml-auto">Some steps failed</span>
-                )}
-              </div>
-              {steps.map((s, i) => <StepRow key={i} step={s} />)}
+              <button
+                type="button"
+                onClick={() => onStart(selectedVc)}
+                className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                🚀 Start VC Automation
+              </button>
             </div>
           )}
 
@@ -217,8 +278,6 @@ export default function VirtualChassisPage() {
                   ${isSelected
                     ? 'border-brand-500 dark:border-brand-400 ring-2 ring-brand-500/20'
                     : 'border-gray-100 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 hover:shadow-md'}`}>
-
-                {/* VC header */}
                 <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                   <div>
                     <p className="text-base font-semibold text-gray-800 dark:text-gray-100">{vc.name}</p>
@@ -233,7 +292,6 @@ export default function VirtualChassisPage() {
                       : <span className="text-xs text-gray-400 dark:text-gray-500">Click to select</span>}
                   </div>
                 </div>
-
                 <MemberTable members={vc.members} />
               </div>
             );
@@ -243,4 +301,14 @@ export default function VirtualChassisPage() {
     </div>
   );
 }
+
+// ── Root component ────────────────────────────────────────────────────────────
+export default function VirtualChassisPage() {
+  const [activeVc, setActiveVc] = useState(null); // null = list view
+
+  return activeVc
+    ? <VCAutomationView vc={activeVc} onBack={() => setActiveVc(null)} />
+    : <VCListView onStart={(vc) => setActiveVc(vc)} />;
+}
+
 
