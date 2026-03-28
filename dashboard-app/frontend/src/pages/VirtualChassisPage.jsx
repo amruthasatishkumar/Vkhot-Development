@@ -87,6 +87,31 @@ function VCAutomationView({ vc, onBack }) {
   useEffect(() => { sessionStorage.setItem('vc:completed', completed ? 'true' : 'false'); }, [completed]);
   useEffect(() => { sessionStorage.setItem('vc:members',   JSON.stringify(members));          }, [members]);
 
+  // Recovery: if the page loads with ran=true but completed=false the previous
+  // run was interrupted (server restart, browser refresh during a wait, etc.).
+  // automating is never persisted so it is always false on mount — detect the
+  // mismatch and mark the run as completed so the UI unlocks immediately.
+  useEffect(() => {
+    if (ran && !completed) {
+      setCompleted(true);
+      setSteps((prev) => {
+        // Only append the interrupted notice if there are already some steps
+        // and the last one is still pending (ok === null).
+        if (prev.length === 0) return prev;
+        const last = prev[prev.length - 1];
+        if (last.ok !== null) return prev; // already resolved
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...last,
+          ok: false,
+          message: last.message + ' (interrupted — server was restarted)',
+        };
+        return updated;
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount only
+
   async function handleRefresh() {
     setRefreshing(true);
     setRefreshErr('');
