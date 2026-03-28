@@ -5,7 +5,7 @@ const NAV_ITEMS = [
   { label: 'Virtual Chassis',          icon: '🔗', page: 'virtual-chassis' },
 ];
 
-export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bounceActive }) {
+export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bounceActive, vcActive }) {
   return (
     <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo */}
@@ -35,6 +35,9 @@ export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bo
               <span className="text-base">{icon}</span>
               {label}
               {page === 'bounce-port' && bounceActive && (
+                <span className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+              {page === 'virtual-chassis' && vcActive && (
                 <span className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               )}
             </button>

@@ -66,7 +66,7 @@ function StepRow({ step }) {
 }
 
 // ── VC Automation Page (detail + runner) ──────────────────────────────────────
-function VCAutomationView({ vc, onBack }) {
+function VCAutomationView({ vc, onBack, onVcStatusChange }) {
   const [automating,  setAutomating]  = useState(false);
   const [steps,       setSteps]       = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('vc:steps')) || []; } catch { return []; }
@@ -86,6 +86,7 @@ function VCAutomationView({ vc, onBack }) {
   useEffect(() => { sessionStorage.setItem('vc:ran',       ran       ? 'true' : 'false'); }, [ran]);
   useEffect(() => { sessionStorage.setItem('vc:completed', completed ? 'true' : 'false'); }, [completed]);
   useEffect(() => { sessionStorage.setItem('vc:members',   JSON.stringify(members));          }, [members]);
+  useEffect(() => { onVcStatusChange?.(automating); }, [automating]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recovery: if the page loads with ran=true but completed=false the previous
   // run was interrupted (server restart, browser refresh during a wait, etc.).
@@ -411,7 +412,7 @@ function VCListView({ onStart }) {
 }
 
 // ── Root component ────────────────────────────────────────────────────────────
-export default function VirtualChassisPage() {
+export default function VirtualChassisPage({ onVcStatusChange }) {
   const [activeVc, setActiveVc] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('vc:activeVc')); } catch { return null; }
   });
@@ -436,7 +437,7 @@ export default function VirtualChassisPage() {
   }
 
   return activeVc
-    ? <VCAutomationView vc={activeVc} onBack={handleBack} />
+    ? <VCAutomationView vc={activeVc} onBack={handleBack} onVcStatusChange={onVcStatusChange} />
     : <VCListView onStart={handleStart} />;
 }
 

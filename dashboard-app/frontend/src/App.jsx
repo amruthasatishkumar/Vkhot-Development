@@ -16,6 +16,7 @@ export default function App() {
   const [dark,         setDark]         = useState(() => localStorage.getItem('theme') === 'dark');
   const [page,         setPage]         = useState(pageFromHash);
   const [bounceActive, setBounceActive] = useState(false);
+  const [vcActive,     setVcActive]     = useState(false);
 
   // Keep URL hash in sync when page changes
   function navigateTo(p) {
@@ -43,13 +44,13 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-950">
-      <Sidebar dark={dark} onToggleDark={() => setDark((d) => !d)} activePage={page} onNavigate={navigateTo} bounceActive={bounceActive} />
+      <Sidebar dark={dark} onToggleDark={() => setDark((d) => !d)} activePage={page} onNavigate={navigateTo} bounceActive={bounceActive} vcActive={vcActive} />
       <main className="flex-1 overflow-y-auto p-8">
         {/* Both pages stay mounted so bounce intervals survive navigation */}
         <div className={page !== 'home'             ? 'hidden' : ''}><DashboardHome onNavigate={navigateTo} /></div>
         <div className={page !== 'networks'         ? 'hidden' : ''}><Dashboard /></div>
         <div className={page !== 'bounce-port'      ? 'hidden' : ''}><BouncePortPage onBounceStatusChange={setBounceActive} /></div>
-        <div className={page !== 'virtual-chassis'  ? 'hidden' : ''}><VirtualChassisPage /></div>
+        <div className={page !== 'virtual-chassis'  ? 'hidden' : ''}><VirtualChassisPage onVcStatusChange={setVcActive} /></div>
       </main>
     </div>
   );
