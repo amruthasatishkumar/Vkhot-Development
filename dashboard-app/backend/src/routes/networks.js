@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, automateVC } = require('../services/mist');
 
 const router = express.Router();
 
@@ -155,33 +155,24 @@ router.get('/virtual-chassis', async (_req, res) => {
   }
 });
 
-// POST /api/networks/vc-preprovision
-// Body: { site_id, device_id, members: [{ mac, vc_role, vc_ports: ["et-0/0/48","et-0/0/49"] }] }
-router.post('/vc-preprovision', async (req, res) => {
-  const { site_id, device_id, members } = req.body;
+// POST /api/networks/vc-automate
+// Body: { site_id, device_id, vc_mac }
+// Runs all VC automation steps sequentially; returns { steps: [{ step, ok, message }] }
+router.post('/vc-automate', async (req, res) => {
+  const { site_id, device_id, vc_mac } = req.body;
 
-  if (!site_id || typeof site_id !== 'string' || !site_id.trim()) {
-    return res.status(400).json({ error: 'site_id is required.' });
-  }
-  if (!device_id || typeof device_id !== 'string' || !device_id.trim()) {
-    return res.status(400).json({ error: 'device_id is required.' });
-  }
-  if (!Array.isArray(members) || members.length === 0) {
-    return res.status(400).json({ error: 'members array is required and must not be empty.' });
-  }
-  const validRoles = ['master', 'backup', 'linecard'];
-  for (const m of members) {
-    if (!m.mac || !MAC_REGEX.test(m.mac.trim())) {
-      return res.status(400).json({ error: `Invalid MAC address: ${m.mac}` });
-    }
-    if (!validRoles.includes(m.vc_role)) {
-      return res.status(400).json({ error: `Invalid vc_role "${m.vc_role}". Must be master, backup, or linecard.` });
-    }
-  }
+  if (!site_id  || typeof site_id  !== 'string' || !site_id.trim())  return res.status(400).json({ error: 'site_id is required.' });
+  if (!device_id || typeof device_id !== 'string' || !device_id.trim()) return res.status(400).json({ error: 'device_id is required.' });
+  if (!vc_mac   || typeof vc_mac   !== 'string' || !vc_mac.trim())   return res.status(400).json({ error: 'vc_mac is required.' });
 
   try {
-    const result = await preprovisionVC(site_id.trim(), device_id.trim(), members);
-    res.json({ ok: true, result });
+    // Fetch current member list so backend can derive roles
+    const vcs = await listVirtualChassis();
+    const vc  = vcs.find((v) => v.vc_mac === vc_mac.trim());
+    if (!vc) return res.status(404).json({ error: `No Virtual Chassis found with vc_mac ${vc_mac}.` });
+
+    const steps = await automateVC(site_id.trim(), device_id.trim(), vc.members);
+    res.json({ steps });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

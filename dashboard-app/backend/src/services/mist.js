@@ -407,34 +407,53 @@ async function listVirtualChassis() {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, automateVC };
+
+// Inventory vc_role → Mist API vc_role mapping
+const VC_ROLE_MAP = {
+  master:   'routing-engine',
+  backup:   'routing-engine',
+  linecard: 'linecard',
+  unknown:  'linecard',
+};
 
 /**
  * Preprovision a Virtual Chassis.
- * Calls POST /api/v1/sites/{site_id}/devices/{device_id}/vc
- * with op=preprovision and per-member role + vc_ports.
+ * Calls PUT /api/v1/sites/{site_id}/devices/{device_id}
+ * with virtual_chassis payload (preprovisioned=true, per-member role+member_id).
  *
  * @param {string} siteId
- * @param {string} deviceId  - the VC logical device ID (mac === vc_mac)
- * @param {Array}  members   - [{ mac, vc_role, vc_ports: string[] }]
+ * @param {string} deviceId  - the VC logical device (mac === vc_mac)
+ * @param {Array}  members   - [{ mac, vc_role }] from listVirtualChassis()
  */
 async function preprovisionVC(siteId, deviceId, members) {
   await validateToken();
 
-  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}/vc`;
-  console.log(`[Mist] POST ${url}`);
+  // Sort: routing-engine first (master then backup), then linecards
+  const roleOrder = { master: 0, backup: 1, linecard: 2, unknown: 3 };
+  const sorted = [...members].sort(
+    (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
+  );
+
+  const vcMembers = sorted.map((m, idx) => ({
+    mac:       normaliseMac(m.mac),
+    vc_role:   VC_ROLE_MAP[m.vc_role] || 'linecard',
+    member_id: idx,
+  }));
 
   const body = {
-    op: 'preprovision',
-    members: members.map((m) => ({
-      mac:      normaliseMac(m.mac),
-      vc_role:  m.vc_role,
-      vc_ports: Array.isArray(m.vc_ports) ? m.vc_ports : [],
-    })),
+    virtual_chassis: {
+      preprovisioned: true,
+      members: vcMembers,
+    },
+    preprovisioned: true,
   };
 
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+  console.log(`[Mist] PUT ${url}`, JSON.stringify(body));
+
   const res = await fetch(url, {
-    method:  'POST',
+    method:  'PUT',
     headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   });
@@ -444,9 +463,34 @@ async function preprovisionVC(siteId, deviceId, members) {
     throw new Error(`Mist preprovision failed (${res.status}): ${text}`);
   }
 
-  // 200/204 — success (Mist may return empty body)
   const text = await res.text();
   return text ? JSON.parse(text) : { ok: true };
+}
+
+/**
+ * Orchestrate all VC automation steps sequentially.
+ * Returns an array of step results: [{ step, ok, message }]
+ *
+ * @param {string} siteId
+ * @param {string} deviceId
+ * @param {Array}  members  - from listVirtualChassis()
+ */
+async function automateVC(siteId, deviceId, members) {
+  const steps = [];
+
+  // Step 1: Preprovision
+  try {
+    await preprovisionVC(siteId, deviceId, members);
+    steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
+  } catch (err) {
+    steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
+    // Abort remaining steps on critical failure
+    return steps;
+  }
+
+  // Future steps go here (e.g. verify membership, configure uplinks)
+
+  return steps;
 }
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
