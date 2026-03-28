@@ -309,22 +309,28 @@ function PortProfilesTab({ templateId }) {
   const [apiError,  setApiError]  = useState('');
 
   // Delete state
-  const [delCount,    setDelCount]    = useState('');
-  const [delCountErr, setDelCountErr] = useState('');
-  const [delPreview,  setDelPreview]  = useState([]);
-  const [loadingDel,  setLoadingDel]  = useState(false);
-  const [deleting,    setDeleting]    = useState(false);
-  const [delSuccess,  setDelSuccess]  = useState(null);
-  const [delApiError, setDelApiError] = useState('');
+  const [delCount,      setDelCount]      = useState('');
+  const [delCountErr,   setDelCountErr]   = useState('');
+  const [delPreview,    setDelPreview]    = useState([]);
+  const [loadingDel,    setLoadingDel]    = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
+  const [delSuccess,    setDelSuccess]    = useState(null);
+  const [delApiError,   setDelApiError]   = useState('');
+  const [profileCount,  setProfileCount]  = useState(null); // total profiles currently on template
 
   useEffect(() => {
     async function load() {
       setLoadingNets(true);
       try {
-        const res  = await fetch(`/api/switch-templates/${templateId}/networks`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to load networks.');
-        setNetworks(data.networks || []);
+        const [netRes, profRes] = await Promise.all([
+          fetch(`/api/switch-templates/${templateId}/networks`),
+          fetch(`/api/switch-templates/${templateId}/port-profiles`),
+        ]);
+        const netData  = await netRes.json();
+        const profData = await profRes.json();
+        if (!netRes.ok)  throw new Error(netData.error  || 'Failed to load networks.');
+        setNetworks(netData.networks || []);
+        setProfileCount((profData.profiles || []).length);
       } catch (err) {
         setNetError(err.message);
       } finally {
@@ -382,6 +388,7 @@ function PortProfilesTab({ templateId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create port profiles.');
       setSuccess({ count: generated.length, names: generated.map((p) => p.name) });
+      setProfileCount((prev) => (prev ?? 0) + generated.length);
       setGenerated([]); setCount('');
     } catch (err) {
       setApiError(err.message);
@@ -420,6 +427,7 @@ function PortProfilesTab({ templateId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete port profiles.');
       setDelSuccess({ count: delPreview.length, names: delPreview.map((p) => p.name) });
+      setProfileCount((prev) => Math.max(0, (prev ?? 0) - delPreview.length));
       setDelPreview([]); setDelCount('');
     } catch (err) {
       setDelApiError(err.message);
@@ -567,7 +575,18 @@ function PortProfilesTab({ templateId }) {
 
       {/* ── Delete section ─────────────────────────────────────────────────────── */}
       <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Delete Port Profiles</h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Delete Port Profiles</h3>
+          {profileCount !== null && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+              profileCount === 0
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-600'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-700'
+            }`}>
+              {profileCount === 0 ? 'No profiles on template' : `${profileCount} profile${profileCount > 1 ? 's' : ''} available to delete`}
+            </span>
+          )}
+        </div>
 
         <div className="flex items-end gap-3">
           <div className="flex-1 max-w-xs">
