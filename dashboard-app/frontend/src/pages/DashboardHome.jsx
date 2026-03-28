@@ -285,10 +285,10 @@ export default function DashboardHome({ onNavigate }) {
       {/* Top header row */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight">Dashboard</p>
-          <p className="text-sm text-gray-400 dark:text-gray-400 mt-0.5">Pick a tool below to get started — everything you need is one click away.</p>
+          <p className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight">Dashboard</p>
+          <p className="text-sm text-gray-400 dark:text-gray-400 mt-1">Pick a tool below to get started — everything you need is one click away.</p>
         </div>
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 w-48 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
+        <div className="ml-auto flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 w-52 focus-within:ring-2 focus-within:ring-brand-500 transition-all flex-shrink-0">
           <svg className="h-4 w-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
