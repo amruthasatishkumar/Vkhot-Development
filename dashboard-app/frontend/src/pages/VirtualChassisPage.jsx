@@ -77,8 +77,6 @@ function VCAutomationView({ vc, onBack }) {
   });
   const [refreshing,  setRefreshing]  = useState(false);
   const [refreshErr,  setRefreshErr]  = useState('');
-  // True when the page was refreshed mid-run — stream is gone but we show last known results
-  const [streamLost,  setStreamLost]  = useState(() => sessionStorage.getItem('vc:ran') === 'true');
 
   useEffect(() => { sessionStorage.setItem('vc:steps',   JSON.stringify(steps));      }, [steps]);
   useEffect(() => { sessionStorage.setItem('vc:ran',     ran ? 'true' : 'false');     }, [ran]);
@@ -104,7 +102,6 @@ function VCAutomationView({ vc, onBack }) {
   async function handleStart() {
     setAutomating(true);
     setRan(true);
-    setStreamLost(false);
     setSteps([]);
     try {
       const res = await fetch('/api/networks/vc-automate', {
@@ -164,9 +161,11 @@ function VCAutomationView({ vc, onBack }) {
 
       {/* Banner with back */}
       <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-2 transition-colors">
-          ← Back to Virtual Chassis list
-        </button>
+        {!ran && (
+          <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-2 transition-colors">
+            ← Back to Virtual Chassis list
+          </button>
+        )}
         <p className="text-lg font-bold text-white tracking-tight">🔗 {vc.name}</p>
         <p className="text-sm text-indigo-100 mt-0.5">Virtual Chassis Automation</p>
       </div>
@@ -214,16 +213,6 @@ function VCAutomationView({ vc, onBack }) {
         <MemberTable members={members} />
       </div>
 
-      {/* Stream-lost notice */}
-      {streamLost && !automating && (
-        <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 px-5 py-3 flex items-start gap-3">
-          <span className="text-yellow-500 text-base mt-0.5">⚠️</span>
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            Page was refreshed — live stream disconnected. Showing last known step results.
-            {ran && ' Click “Run Again” to re-run the automation.'}
-          </p>
-        </div>
-      )}
 
       {/* Automation launcher */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
