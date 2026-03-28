@@ -161,7 +161,7 @@ function VCAutomationView({ vc, onBack }) {
 
       {/* Banner with back */}
       <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
-        {!ran && (
+        {(!ran || (ran && !automating)) && (
           <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-2 transition-colors">
             ← Back to Virtual Chassis list
           </button>
@@ -223,13 +223,19 @@ function VCAutomationView({ vc, onBack }) {
               Runs each automation step sequentially and reports the result.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleStart}
-            disabled={automating}
-            className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
-            {automating ? '⏳ Running…' : ran ? '🔄 Run Again' : '🚀 Start VC Automation'}
-          </button>
+          {!automating && (
+            <button
+              type="button"
+              onClick={handleStart}
+              className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors">
+              {ran ? '🔄 Run Again' : '🚀 Start VC Automation'}
+            </button>
+          )}
+          {automating && (
+            <span className="px-6 py-2.5 text-sm font-semibold text-gray-400 dark:text-gray-500">
+              ⏳ Running…
+            </span>
+          )}
         </div>
 
         {/* Step log */}
