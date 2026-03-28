@@ -24,6 +24,7 @@ export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bo
               key={label}
               type="button"
               onClick={() => onNavigate(page)}
+              style={isActive ? { transform: 'scale(1.07)', transformOrigin: 'left center', transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)' } : { transition: 'transform 0.2s ease' }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left
                 ${
                   isActive
