@@ -65,10 +65,20 @@ function FlipCard({ title, backHeader, backItems, onClick, accent = '#6366f1', i
             </div>
             <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem', letterSpacing: '0.05em' }}>⋮</span>
           </div>
-          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.01em', color: '#ffffff', lineHeight: 1.3, margin: 0 }}>
+          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.01em', color: accent, lineHeight: 1.3, margin: 0 }}>
             {title}
           </p>
-          <span style={{ marginTop: 'auto', fontSize: '0.7rem', fontWeight: 500, color: 'rgba(255,255,255,0.35)' }}>
+          <span style={{
+            marginTop: 'auto',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: '#ffffff',
+            backgroundColor: `${accent}33`,
+            border: `1px solid ${accent}55`,
+            borderRadius: '0.4rem',
+            padding: '0.2rem 0.5rem',
+            alignSelf: 'flex-start',
+          }}>
             Hover to preview →
           </span>
         </div>
