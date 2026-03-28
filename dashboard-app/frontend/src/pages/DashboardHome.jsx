@@ -216,6 +216,120 @@ function useRunsInProgress() {
   return runs;
 }
 
+// ── Inventory stats hook — polls /api/inventory/stats every 30 s ─────────────
+function useInventoryStats() {
+  const [data,        setData]        = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/inventory/stats');
+      const json = await res.json();
+      if (!res.ok) { setError(json.error || 'Failed to load inventory.'); setData(null); }
+      else         { setData(json); setError(''); setLastUpdated(new Date()); }
+    } catch {
+      setError('Could not reach the backend.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { data, loading, error, lastUpdated, refresh: load };
+}
+
+// ── Per-device-type inventory card ───────────────────────────────────────────
+const INV_CARDS = [
+  { key: 'standalone', label: 'Standalone Switches', icon: '🔌', accent: '#3b82f6', bg: 'bg-blue-50 dark:bg-blue-900/20',     border: 'border-blue-200 dark:border-blue-800' },
+  { key: 'vc',         label: 'VC Switches',         icon: '🔗', accent: '#8b5cf6', bg: 'bg-violet-50 dark:bg-violet-900/20', border: 'border-violet-200 dark:border-violet-800' },
+  { key: 'ap',         label: 'Access Points',       icon: '📡', accent: '#f59e0b', bg: 'bg-amber-50 dark:bg-amber-900/20',   border: 'border-amber-200 dark:border-amber-800' },
+];
+
+function InventoryPanel() {
+  const { data, loading, error, lastUpdated, refresh } = useInventoryStats();
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-gray-700 dark:text-gray-200 tracking-tight flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5">
+            {loading
+              ? <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+              : <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />}
+          </span>
+          Live Inventory
+        </p>
+        <button type="button" onClick={refresh} disabled={loading} title="Refresh now"
+          className="text-lg text-gray-400 hover:text-brand-500 disabled:opacity-40 transition-colors leading-none">
+          ↻
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-xs text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      )}
+
+      {/* Cards */}
+      {INV_CARDS.map(({ key, label, icon, accent, bg, border }) => {
+        const d = data?.[key];
+        const total        = loading && !d ? null : (d?.total        ?? 0);
+        const connected    = loading && !d ? null : (d?.connected    ?? 0);
+        const disconnected = loading && !d ? null : (d?.disconnected ?? 0);
+        return (
+          <div key={key} className={`rounded-2xl border shadow-sm px-5 py-4 ${bg} ${border}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl leading-none">{icon}</span>
+              <p className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-tight leading-tight">{label}</p>
+            </div>
+            <p className="text-4xl font-extrabold leading-none mb-3" style={{ color: accent }}>
+              {total === null ? '—' : total}
+            </p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block flex-shrink-0" />
+                  Connected
+                </span>
+                <span className="font-bold text-green-600 dark:text-green-400">
+                  {connected === null ? '…' : connected}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
+                  Disconnected
+                </span>
+                <span className="font-bold text-red-500 dark:text-red-400">
+                  {disconnected === null ? '…' : disconnected}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Last updated */}
+      {lastUpdated && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+          Updated {lastUpdated.toLocaleTimeString('en-US', { hour12: false })} · auto-refreshes every 30s
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Static slot definitions — always shown
 const RUN_SLOTS = [
   { key: 'bounce_1', label: 'Bounce – Switch 1', page: 'bounce-port', idleColor: '#10b981', idleTrack: '#d1fae5' },
@@ -293,59 +407,65 @@ function RunsInProgress({ runs, onNavigate }) {
 export default function DashboardHome({ onNavigate }) {
   const runs = useRunsInProgress();
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="flex flex-col lg:flex-row gap-8 max-w-6xl">
 
-      {/* Top header */}
-      <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-zinc-800 px-8 py-6 shadow-md relative overflow-hidden">
-        <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
-        <div className="absolute bottom-0 left-1/4 h-16 w-16 rounded-full bg-white/5 blur-xl" />
-        {/* Dashboard grid icon — top right */}
-        <div className="absolute right-8 top-1/2 -translate-y-1/2">
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* top-left square — red accent */}
-            <rect x="4" y="4" width="26" height="26" rx="6" fill="#ef4444" fillOpacity="0.9" />
-            {/* top-right square */}
-            <rect x="34" y="4" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
-            {/* bottom-left square */}
-            <rect x="4" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
-            {/* bottom-right square */}
-            <rect x="34" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
-          </svg>
+      {/* ── Left column: main content ─────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 space-y-8">
+
+        {/* Top header */}
+        <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-zinc-800 px-8 py-6 shadow-md relative overflow-hidden">
+          <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
+          <div className="absolute bottom-0 left-1/4 h-16 w-16 rounded-full bg-white/5 blur-xl" />
+          {/* Dashboard grid icon — top right */}
+          <div className="absolute right-8 top-1/2 -translate-y-1/2">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="4" width="26" height="26" rx="6" fill="#ef4444" fillOpacity="0.9" />
+              <rect x="34" y="4" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+              <rect x="4" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+              <rect x="34" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+            </svg>
+          </div>
+          <p className="text-5xl font-extrabold text-white tracking-tight leading-tight relative">Dashboard</p>
+          <p className="text-base text-slate-300 mt-2 relative">Pick a tool below to get started — everything you need is one click away.</p>
         </div>
-        <p className="text-5xl font-extrabold text-white tracking-tight leading-tight relative">Dashboard</p>
-        <p className="text-base text-slate-300 mt-2 relative">Pick a tool below to get started — everything you need is one click away.</p>
+
+        {/* Feature flip-cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          <FlipCard
+            title="Networks & Port Profiles"
+            backHeader="Here you can create Bulk"
+            backItems={NETWORKS_BACK_ITEMS}
+            onClick={() => onNavigate('networks')}
+          />
+          <FlipCard
+            title="Bounce Ports"
+            backHeader="Here you can Continuously Bounce Port"
+            backItems={BOUNCE_BACK_ITEMS}
+            onClick={() => onNavigate('bounce-port')}
+          />
+          <FlipCard
+            title="Virtual Chassis"
+            backHeader="Here you can run VC automation"
+            backItems={VC_BACK_ITEMS}
+            onClick={() => onNavigate('virtual-chassis')}
+          />
+          <FlipCard
+            title="Org Template"
+            backHeader="Here you can create Switch Templates"
+            backItems={SWITCH_TEMPLATE_BACK_ITEMS}
+            onClick={() => onNavigate('switch-template')}
+          />
+        </div>
+
+        {/* Runs in Progress */}
+        <RunsInProgress runs={runs} onNavigate={onNavigate} />
+
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        <FlipCard
-          title="Networks & Port Profiles"
-          backHeader="Here you can create Bulk"
-          backItems={NETWORKS_BACK_ITEMS}
-          onClick={() => onNavigate('networks')}
-        />
-        <FlipCard
-          title="Bounce Ports"
-          backHeader="Here you can Continuously Bounce Port"
-          backItems={BOUNCE_BACK_ITEMS}
-          onClick={() => onNavigate('bounce-port')}
-        />
-        <FlipCard
-          title="Virtual Chassis"
-          backHeader="Here you can run VC automation"
-          backItems={VC_BACK_ITEMS}
-          onClick={() => onNavigate('virtual-chassis')}
-        />
-        <FlipCard
-          title="Org Template"
-          backHeader="Here you can create Switch Templates"
-          backItems={SWITCH_TEMPLATE_BACK_ITEMS}
-          onClick={() => onNavigate('switch-template')}
-        />
+      {/* ── Right column: live inventory panel ────────────────────────────── */}
+      <div className="w-full lg:w-72 xl:w-80 shrink-0">
+        <InventoryPanel />
       </div>
-
-      {/* Runs in Progress */}
-      <RunsInProgress runs={runs} onNavigate={onNavigate} />
 
     </div>
   );

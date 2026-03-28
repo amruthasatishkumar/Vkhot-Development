@@ -36,9 +36,11 @@ init()
     const apiRoutes             = require('./routes/api');
     const networkRoutes         = require('./routes/networks');
     const switchTemplateRoutes  = require('./routes/switch-templates');
+    const inventoryRoutes       = require('./routes/inventory');
     app.use('/api', apiRoutes);
     app.use('/api/networks', networkRoutes);
     app.use('/api/switch-templates', switchTemplateRoutes);
+    app.use('/api/inventory', inventoryRoutes);
     app.listen(PORT, () => {
       console.log(`Backend running at http://localhost:${PORT}`);
     });

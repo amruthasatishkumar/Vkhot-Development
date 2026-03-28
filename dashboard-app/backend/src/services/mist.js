@@ -677,7 +677,63 @@ async function updateOrgNetworkTemplatePortProfiles(orgId, templateId, profilesM
   return putText ? JSON.parse(putText) : { ok: true };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate, updateOrgNetworkTemplatePortProfiles, deleteOrgNetworkTemplatePortProfiles };
+/**
+ * Fetch org inventory and return device counts grouped by type and connection status.
+ * Paginates automatically (1000 per page) until all devices are retrieved.
+ * Returns:
+ *   { standalone: { total, connected, disconnected },
+ *     vc:         { total, connected, disconnected },
+ *     ap:         { total, connected, disconnected } }
+ */
+async function getOrgInventoryStats() {
+  await validateToken();
+
+  let allDevices = [];
+  let page = 1;
+  const limit = 1000;
+
+  while (true) {
+    const url = `${BASE_URL}/api/v1/orgs/${ORG_ID}/inventory?limit=${limit}&page=${page}`;
+    console.log(`[Mist] GET ${url}`);
+    const res = await fetch(url, { headers: mistHeaders() });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Inventory fetch failed (${res.status}): ${body}`);
+    }
+    const devices = await res.json();
+    if (!Array.isArray(devices)) throw new Error('Unexpected inventory response shape');
+    allDevices = allDevices.concat(devices);
+    if (devices.length < limit) break;
+    page++;
+  }
+
+  const stats = {
+    standalone: { total: 0, connected: 0, disconnected: 0 },
+    vc:         { total: 0, connected: 0, disconnected: 0 },
+    ap:         { total: 0, connected: 0, disconnected: 0 },
+  };
+
+  for (const d of allDevices) {
+    const isConnected = d.connected === true || d.status === 'connected';
+    if (d.type === 'ap') {
+      stats.ap.total++;
+      if (isConnected) stats.ap.connected++; else stats.ap.disconnected++;
+    } else if (d.type === 'switch') {
+      // vc_mac present → this switch is a member of a Virtual Chassis
+      if (d.vc_mac) {
+        stats.vc.total++;
+        if (isConnected) stats.vc.connected++; else stats.vc.disconnected++;
+      } else {
+        stats.standalone.total++;
+        if (isConnected) stats.standalone.connected++; else stats.standalone.disconnected++;
+      }
+    }
+  }
+
+  return stats;
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate, updateOrgNetworkTemplatePortProfiles, deleteOrgNetworkTemplatePortProfiles, getOrgInventoryStats };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {
