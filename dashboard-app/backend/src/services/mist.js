@@ -442,7 +442,7 @@ async function listVirtualChassis() {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, automateVC };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {
@@ -657,6 +657,32 @@ async function changeRoleFpc0(siteId, deviceId) {
  * @param {Array}  members  - from listVirtualChassis()
  */
 
+/**
+ * Trigger a routing-engine switchover on a Virtual Chassis.
+ * This makes the current backup RE become the new master.
+ *
+ * @param {string} siteId
+ * @param {string} deviceId
+ */
+async function switchoverRoutingEngine(siteId, deviceId) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}/vc/switch_master`;
+  console.log(`[Mist] POST ${url} (switchover routing engine)`);
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mist switchover routing engine failed (${res.status}): ${text}`);
+  }
+
+  const text = await res.text();
+  return text ? JSON.parse(text) : { ok: true };
+}
+
 // Resolves after `ms` milliseconds, but rejects early (with .cancelled=true)
 // if isCancelled() returns true (checked every 500 ms).
 function abortableWait(ms, isCancelled) {
@@ -783,7 +809,27 @@ async function automateVC(siteId, deviceId, members, emit, isCancelled = () => f
     emit({ step: 'Change Role of fpc0', ok: false, message: err.message });
   }
 
-  // Future steps go here
+  // ── Step 7: Wait 5 minutes before RE switchover ────────────────────────
+  const SWITCHOVER_WAIT_MS = 5 * 60 * 1000; // 5 minutes
+  emit({ step: 'Waiting before RE switchover', ok: null, message: 'Waiting 5 minutes after role change to allow Mist to stabilise before triggering the RE switchover…' });
+  try {
+    await abortableWait(SWITCHOVER_WAIT_MS, isCancelled);
+  } catch (err) {
+    if (err.cancelled) {
+      emit({ step: 'Waiting before RE switchover', ok: false, message: 'Automation stopped by user during wait.' });
+      return;
+    }
+    throw err;
+  }
+  emit({ step: 'Waiting before RE switchover', ok: true, message: 'Wait complete — triggering RE switchover' });
+
+  // ── Step 8: Switchover Routing Engine ─────────────────────────────────
+  try {
+    await switchoverRoutingEngine(siteId, deviceId);
+    emit({ step: 'Switchover Routing Engine', ok: true, message: 'Routing engine switchover triggered successfully. The backup RE is now becoming the new master.' });
+  } catch (err) {
+    emit({ step: 'Switchover Routing Engine', ok: false, message: err.message });
+  }
 }
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;

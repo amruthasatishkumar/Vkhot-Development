@@ -183,7 +183,7 @@ function useRunsInProgress() {
         if (ran && !completed) {
           const steps      = JSON.parse(sessionStorage.getItem('vc:steps')) || [];
           const done       = steps.filter((s) => s.ok !== null).length;
-          const total      = Math.max(steps.length, 6);
+          const total      = Math.max(steps.length, 8);
           const pct        = total === 0 ? 0 : Math.round((done / total) * 100);
           const activeStep = steps.find((s) => s.ok === null);
           result.push({
