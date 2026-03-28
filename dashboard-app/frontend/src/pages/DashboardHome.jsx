@@ -247,10 +247,29 @@ function useInventoryStats() {
 }
 
 // ── Per-device-type inventory card ───────────────────────────────────────────
+// accent = vivid card color, numColor = big number color, bg = card bg gradient
 const INV_CARDS = [
-  { key: 'standalone', label: 'Standalone Switches', icon: '🔌' },
-  { key: 'vc',         label: 'VC Switches',         icon: '🔗' },
-  { key: 'ap',         label: 'Access Points',       icon: '📡' },
+  {
+    key: 'standalone', label: 'Standalone Switches', icon: '🔌',
+    bg:      'linear-gradient(135deg, #1a1f2e 0%, #1e2540 100%)',
+    numColor: '#60a5fa',
+    iconBg:   'rgba(96,165,250,0.12)',
+    border:   '1px solid rgba(96,165,250,0.2)',
+  },
+  {
+    key: 'vc', label: 'VC Switches', icon: '🔗',
+    bg:      'linear-gradient(135deg, #151b3a 0%, #1e2a5e 100%)',
+    numColor: '#818cf8',
+    iconBg:   'rgba(129,140,248,0.12)',
+    border:   '1px solid rgba(129,140,248,0.25)',
+  },
+  {
+    key: 'ap', label: 'Access Points', icon: '📡',
+    bg:      'linear-gradient(135deg, #1a1a2e 0%, #2a1f3d 100%)',
+    numColor: '#f472b6',
+    iconBg:   'rgba(244,114,182,0.12)',
+    border:   '1px solid rgba(244,114,182,0.2)',
+  },
 ];
 
 function InventoryPanel() {
@@ -276,52 +295,56 @@ function InventoryPanel() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl bg-red-900/40 border border-red-700 px-4 py-3 text-xs text-red-400">
+        <div className="rounded-xl px-4 py-3 text-xs text-red-400"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
           {error}
         </div>
       )}
 
       {/* Cards */}
-      {INV_CARDS.map(({ key, label, icon }) => {
+      {INV_CARDS.map(({ key, label, icon, bg, numColor, iconBg, border }) => {
         const d            = data?.[key];
         const total        = loading && !d ? null : (d?.total        ?? 0);
         const connected    = loading && !d ? null : (d?.connected    ?? 0);
         const disconnected = loading && !d ? null : (d?.disconnected ?? 0);
         const hasDisc      = disconnected !== null && disconnected > 0;
         return (
-          <div key={key}
-            className="rounded-2xl px-5 py-4 shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #1e2130 0%, #252a3a 100%)' }}>
-            {/* Label row */}
-            <p className="text-xs font-semibold tracking-widest uppercase mb-3"
-               style={{ color: 'rgba(255,255,255,0.45)' }}>
-              {icon} {label}
-            </p>
-            {/* Big total */}
-            <p className="text-4xl font-extrabold text-white leading-none mb-4"
-               style={{ letterSpacing: '-0.02em' }}>
-              {total === null ? '—' : total.toLocaleString()}
-            </p>
-            {/* Connected / Disconnected pills */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80' }}>
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                  <path d="M4 7V1M1 4l3-3 3 3" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {connected === null ? '…' : connected}
-                <span style={{ color: 'rgba(74,222,128,0.6)', fontWeight: 400 }}>connected</span>
+          <div key={key} className="rounded-2xl px-5 py-4 shadow-xl"
+            style={{ background: bg, border }}>
+
+            {/* Top row: label + icon badge */}
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-widest leading-tight"
+                style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {label}
+              </p>
+              <span className="text-base leading-none rounded-lg p-1.5 flex-shrink-0"
+                style={{ background: iconBg }}>
+                {icon}
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-                style={{ background: hasDisc ? 'rgba(239,68,68,0.15)' : 'rgba(107,114,128,0.15)',
-                         color:      hasDisc ? '#f87171' : 'rgba(255,255,255,0.3)' }}>
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                  <path d="M4 1v6M1 4l3 3 3-3"
-                    stroke={hasDisc ? '#f87171' : 'rgba(255,255,255,0.3)'}
-                    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+            </div>
+
+            {/* Big number */}
+            <p className="text-5xl font-extrabold leading-none mb-4"
+              style={{ color: numColor, letterSpacing: '-0.03em', textShadow: `0 0 24px ${numColor}55` }}>
+              {total === null ? '—' : String(total).padStart(2, '0')}
+            </p>
+
+            {/* Connected / Disconnected row */}
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-xs font-semibold"
+                style={{ color: '#4ade80' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+                {connected === null ? '…' : connected}
+                <span className="font-normal" style={{ color: 'rgba(74,222,128,0.55)' }}> on</span>
+              </span>
+              <span className="w-px h-3 bg-white/10 inline-block" />
+              <span className="flex items-center gap-1 text-xs font-semibold"
+                style={{ color: hasDisc ? '#f87171' : 'rgba(255,255,255,0.2)' }}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block"
+                  style={{ background: hasDisc ? '#f87171' : 'rgba(255,255,255,0.2)' }} />
                 {disconnected === null ? '…' : disconnected}
-                <span style={{ fontWeight: 400, opacity: 0.7 }}>disconnected</span>
+                <span className="font-normal" style={{ opacity: 0.55 }}> off</span>
               </span>
             </div>
           </div>
@@ -330,8 +353,8 @@ function InventoryPanel() {
 
       {/* Last updated */}
       {lastUpdated && (
-        <p className="text-xs text-center mt-1" style={{ color: 'rgba(156,163,175,0.6)' }}>
-          Updated {lastUpdated.toLocaleTimeString('en-US', { hour12: false })} · auto-refreshes every 30s
+        <p className="text-xs text-center mt-1" style={{ color: 'rgba(156,163,175,0.5)' }}>
+          Updated {lastUpdated.toLocaleTimeString('en-US', { hour12: false })} · refreshes every 30s
         </p>
       )}
     </div>
