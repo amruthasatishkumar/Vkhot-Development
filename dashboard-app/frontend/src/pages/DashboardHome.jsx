@@ -284,6 +284,19 @@ export default function DashboardHome({ onNavigate }) {
       <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-zinc-800 px-8 py-6 shadow-md relative overflow-hidden">
         <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
         <div className="absolute bottom-0 left-1/4 h-16 w-16 rounded-full bg-white/5 blur-xl" />
+        {/* Dashboard grid icon — top right */}
+        <div className="absolute right-8 top-1/2 -translate-y-1/2">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* top-left square — red accent */}
+            <rect x="4" y="4" width="26" height="26" rx="6" fill="#ef4444" fillOpacity="0.9" />
+            {/* top-right square */}
+            <rect x="34" y="4" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+            {/* bottom-left square */}
+            <rect x="4" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+            {/* bottom-right square */}
+            <rect x="34" y="34" width="26" height="26" rx="6" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" />
+          </svg>
+        </div>
         <p className="text-5xl font-extrabold text-white tracking-tight leading-tight relative">Dashboard</p>
         <p className="text-base text-slate-300 mt-2 relative">Pick a tool below to get started — everything you need is one click away.</p>
       </div>
