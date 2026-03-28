@@ -333,7 +333,7 @@ function TemplateDetailView({ template, onBack }) {
 }
 
 // ── Create form view ──────────────────────────────────────────────────────────
-function CreateTemplateView({ savedTemplates, onCreated, onSelectTemplate }) {
+function CreateTemplateView({ savedTemplates, onCreated, onSelectTemplate, onDeleteTemplate }) {
   const [name,     setName]     = useState('');
   const [nameErr,  setNameErr]  = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -416,18 +416,30 @@ function CreateTemplateView({ savedTemplates, onCreated, onSelectTemplate }) {
           </p>
           <div className="space-y-2">
             {savedTemplates.map((t) => (
-              <button key={t.id} type="button" onClick={() => onSelectTemplate(t)}
-                className="w-full text-left rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-teal-400 dark:hover:border-teal-500 hover:shadow-md shadow-sm transition-all px-5 py-4 group">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-                      {t.name}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{t.id}</p>
+              <div key={t.id} className="flex items-center gap-2">
+                <button type="button" onClick={() => onSelectTemplate(t)}
+                  className="flex-1 text-left rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-teal-400 dark:hover:border-teal-500 hover:shadow-md shadow-sm transition-all px-5 py-4 group">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800 dark:text-gray-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                        {t.name}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{t.id}</p>
+                    </div>
+                    <span className="text-gray-300 dark:text-gray-600 group-hover:text-teal-500 transition-colors text-lg">→</span>
                   </div>
-                  <span className="text-gray-300 dark:text-gray-600 group-hover:text-teal-500 transition-colors text-lg">→</span>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteTemplate(t)}
+                  title="Delete template"
+                  className="flex-shrink-0 rounded-xl border border-red-200 dark:border-red-800 bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-400 p-3 transition-colors shadow-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -442,24 +454,61 @@ export default function SwitchTemplatePage() {
   const [savedTemplates, setSavedTemplates] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('st:templates')) || []; } catch { return []; }
   });
-  const [activeTemplate, setActiveTemplate] = useState(null);
+  const [activeTemplate,  setActiveTemplate]  = useState(null);
+  const [deletingId,      setDeletingId]      = useState(null);
+  const [deleteError,     setDeleteError]     = useState('');
 
   function handleCreated(template) {
-    // Add to front of list, deduplicate by id
     const updated = [template, ...savedTemplates.filter((t) => t.id !== template.id)];
     sessionStorage.setItem('st:templates', JSON.stringify(updated));
     setSavedTemplates(updated);
     setActiveTemplate(template);
   }
 
+  async function handleDeleteTemplate(template) {
+    if (!window.confirm(`Delete template "${template.name}" from Mist? This cannot be undone.`)) return;
+    setDeletingId(template.id);
+    setDeleteError('');
+    try {
+      const res = await fetch(`/api/switch-templates/${template.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete template.');
+      const updated = savedTemplates.filter((t) => t.id !== template.id);
+      sessionStorage.setItem('st:templates', JSON.stringify(updated));
+      setSavedTemplates(updated);
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (activeTemplate) {
     return <TemplateDetailView template={activeTemplate} onBack={() => setActiveTemplate(null)} />;
   }
   return (
-    <CreateTemplateView
-      savedTemplates={savedTemplates}
-      onCreated={handleCreated}
-      onSelectTemplate={setActiveTemplate}
-    />
+    <>
+      <CreateTemplateView
+        savedTemplates={savedTemplates}
+        onCreated={handleCreated}
+        onSelectTemplate={setActiveTemplate}
+        onDeleteTemplate={handleDeleteTemplate}
+      />
+      {deletingId && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl px-8 py-6 flex items-center gap-3">
+            <Spinner />
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Deleting template from Mist…</p>
+          </div>
+        </div>
+      )}
+      {deleteError && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-red-50 dark:bg-red-900/80 border border-red-200 dark:border-red-700 px-5 py-4 shadow-lg max-w-sm">
+          <p className="text-sm font-semibold text-red-700 dark:text-red-300">❌ Delete failed</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{deleteError}</p>
+          <button type="button" onClick={() => setDeleteError('')} className="mt-2 text-xs text-red-500 hover:underline">Dismiss</button>
+        </div>
+      )}
+    </>
   );
 }

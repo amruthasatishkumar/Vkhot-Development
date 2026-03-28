@@ -575,7 +575,28 @@ async function deleteOrgNetworkTemplateNetworks(orgId, templateId, networkNames)
   return putText ? JSON.parse(putText) : { ok: true };
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks };
+/**
+ * Delete an org-level network template entirely.
+ *
+ * @param {string} orgId
+ * @param {string} templateId
+ */
+async function deleteOrgNetworkTemplate(orgId, templateId) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/orgs/${orgId}/networktemplates/${templateId}`;
+  console.log(`[Mist] DELETE ${url}`);
+  const res = await fetch(url, { method: 'DELETE', headers: mistHeaders() });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mist delete template failed (${res.status}): ${text}`);
+  }
+
+  return { ok: true };
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {

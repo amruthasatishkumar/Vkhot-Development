@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks } = require('../services/mist');
+const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate } = require('../services/mist');
 
 const router = express.Router();
 
@@ -81,6 +81,18 @@ router.delete('/:id/networks', async (req, res) => {
   try {
     const result = await deleteOrgNetworkTemplateNetworks(process.env.MIST_ORG_ID, id, names);
     res.json(result);
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
+// DELETE /api/switch-templates/:id
+// Deletes the entire org-level network template.
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await deleteOrgNetworkTemplate(process.env.MIST_ORG_ID, id);
+    res.json({ ok: true });
   } catch (err) {
     res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
   }
