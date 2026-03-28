@@ -114,7 +114,7 @@ router.get('/:id/port-profiles', async (req, res) => {
 });
 
 // PUT /api/switch-templates/:id/port-profiles
-// Body: { profiles: [{ name, mode, port_network, voip_network }] }
+// Body: { profiles: [{ name, mode, port_network, voip_network, speed?, duplex?, mac_limit? }] }
 // Merges port profiles into the template's port_usages.
 router.put('/:id/port-profiles', async (req, res) => {
   const { id } = req.params;
@@ -124,6 +124,9 @@ router.put('/:id/port-profiles', async (req, res) => {
     return res.status(400).json({ error: 'profiles must be a non-empty array.' });
   }
 
+  const VALID_SPEEDS  = ['auto', '10', '100', '1000', '2500', '5000', '10000'];
+  const VALID_DUPLEX  = ['auto', 'half', 'full'];
+
   const profilesMap = {};
   for (const p of profiles) {
     if (!p.name || !p.mode || !p.port_network || !p.voip_network) {
@@ -132,7 +135,16 @@ router.put('/:id/port-profiles', async (req, res) => {
     if (!['trunk', 'access'].includes(p.mode)) {
       return res.status(400).json({ error: 'mode must be trunk or access.' });
     }
-    profilesMap[p.name] = { mode: p.mode, port_network: p.port_network, voip_network: p.voip_network };
+    if (p.speed  && !VALID_SPEEDS.includes(p.speed))  return res.status(400).json({ error: `Invalid speed value: ${p.speed}` });
+    if (p.duplex && !VALID_DUPLEX.includes(p.duplex)) return res.status(400).json({ error: `Invalid duplex value: ${p.duplex}` });
+    if (p.mac_limit !== undefined && (typeof p.mac_limit !== 'number' || p.mac_limit < 1 || p.mac_limit > 255)) {
+      return res.status(400).json({ error: 'mac_limit must be a number between 1 and 255.' });
+    }
+    const entry = { mode: p.mode, port_network: p.port_network, voip_network: p.voip_network };
+    if (p.speed     !== undefined) entry.speed     = p.speed;
+    if (p.duplex    !== undefined) entry.duplex    = p.duplex;
+    if (p.mac_limit !== undefined) entry.mac_limit = p.mac_limit;
+    profilesMap[p.name] = entry;
   }
 
   try {

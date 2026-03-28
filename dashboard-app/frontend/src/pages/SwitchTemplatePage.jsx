@@ -361,23 +361,29 @@ function PortProfilesTab({ templateId }) {
     load();
   }, [templateId]);
 
-  // For each profile, randomly pick two distinct networks from the available pool.
+  // For each profile, randomly pick two distinct networks from the available pool,
+  // and also randomise Speed, Duplex, and Mac Limit (same values applied to all profiles in the batch).
   function generateProfiles(n) {
+    const SPEEDS  = ['auto', '10', '100', '1000', '2500', '5000', '10000'];
+    const DUPLEX  = ['auto', 'half', 'full'];
+    const pick    = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // One shared set of values for the entire batch
+    const batchSpeed    = pick(SPEEDS);
+    const batchDuplex   = pick(DUPLEX);
+    const batchMacLimit = Math.floor(Math.random() * 255) + 1; // 1–255
+
     const usedProfileIds = new Set();
     const list           = [];
-    // Shuffle a copy of networks so we spread usage across the whole pool.
     const shuffled = [...networks].sort(() => Math.random() - 0.5);
 
     for (let i = 0; i < n; i++) {
-      // Pick port_network and voip_network as two different networks from the pool.
-      // Rotate through the shuffled list so all networks get used.
       const portIdx = (i * 2)     % shuffled.length;
       let   voipIdx = (i * 2 + 1) % shuffled.length;
-      // If they land on the same index (only possible when pool size === 1, guarded below), shift.
       if (voipIdx === portIdx) voipIdx = (voipIdx + 1) % shuffled.length;
 
       let profileId;
-      do { profileId = Math.floor(Math.random() * 900) + 100; } // 100–999
+      do { profileId = Math.floor(Math.random() * 900) + 100; }
       while (usedProfileIds.has(profileId));
       usedProfileIds.add(profileId);
 
@@ -386,6 +392,9 @@ function PortProfilesTab({ templateId }) {
         mode,
         port_network: shuffled[portIdx].name,
         voip_network: shuffled[voipIdx].name,
+        speed:        batchSpeed,
+        duplex:       batchDuplex,
+        mac_limit:    batchMacLimit,
       });
     }
     return list;
@@ -484,7 +493,9 @@ function PortProfilesTab({ templateId }) {
       {/* Info pill */}
       <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-700 px-3 py-1.5 text-xs text-teal-700 dark:text-teal-300">
         <span>🎲</span>
-        <span>{networks.length} network{networks.length > 1 ? 's' : ''} available — port &amp; VoIP networks are assigned randomly per profile</span>
+        <span>
+          {networks.length} network{networks.length > 1 ? 's' : ''} available — port &amp; VoIP networks, Speed, Duplex &amp; Mac Limit are all assigned randomly per profile
+        </span>
       </div>
 
       {/* Controls row */}
@@ -542,7 +553,7 @@ function PortProfilesTab({ templateId }) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
-                  {['Profile Name', 'Mode', 'Port Network', 'VoIP Network'].map((h) => (
+                  {['Profile Name', 'Mode', 'Port Network', 'VoIP Network', 'Speed', 'Duplex', 'Mac Limit'].map((h) => (
                     <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -562,6 +573,9 @@ function PortProfilesTab({ templateId }) {
                     </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.port_network}</td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.voip_network}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.speed}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.duplex}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.mac_limit}</td>
                   </tr>
                 ))}
               </tbody>
