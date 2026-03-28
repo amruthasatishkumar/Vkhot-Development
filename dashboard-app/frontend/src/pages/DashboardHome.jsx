@@ -1,8 +1,102 @@
-const CARDS = [
-  { page: 'networks',        icon: '🌐', title: 'Networks & Port Profiles' },
-  { page: 'bounce-port',     icon: '🔄', title: 'Bounce Ports'             },
-  { page: 'virtual-chassis', icon: '🔗', title: 'Virtual Chassis'          },
+import { useState } from 'react';
+
+const NETWORKS_BACK_ITEMS = [
+  'Create bulk VLANs across your org',
+  'Build and assign Port Profiles',
+  'Assign profiles to switch down-ports',
+  'Remove app-created VLANs & profiles',
 ];
+
+function FlipCard({ title, backItems, onClick }) {
+  const [flipped, setFlipped] = useState(false);
+
+  const faceBase = {
+    position: 'absolute', inset: 0,
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden',
+    borderRadius: '1rem',
+    padding: '1.5rem',
+    display: 'flex',
+    flexDirection: 'column',
+  };
+
+  return (
+    <div
+      style={{ perspective: '1000px', height: '160px' }}
+      onMouseEnter={() => setFlipped(true)}
+      onMouseLeave={() => setFlipped(false)}
+    >
+      <div style={{
+        position: 'relative', width: '100%', height: '100%',
+        transformStyle: 'preserve-3d',
+        transition: 'transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1)',
+        transform: flipped ? 'rotateY(180deg) translateY(-6px)' : 'rotateY(0deg)',
+        filter: flipped
+          ? 'drop-shadow(0 20px 40px rgba(0,0,0,0.18))'
+          : 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))',
+      }}>
+
+        {/* Front */}
+        <div
+          className="dark:!bg-amber-50"
+          style={{ ...faceBase, backgroundColor: 'white', border: '1px solid #f3f4f6' }}
+        >
+          <p style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
+            {title}
+          </p>
+          <span style={{ marginTop: 'auto', fontSize: '0.75rem', fontWeight: 500, color: '#9ca3af' }}>
+            Hover to preview →
+          </span>
+        </div>
+
+        {/* Back */}
+        <div
+          onClick={onClick}
+          style={{
+            ...faceBase,
+            transform: 'rotateY(180deg)',
+            background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 100%)',
+            cursor: 'pointer',
+          }}
+        >
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>
+            What you can do
+          </p>
+          <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {backItems.map((item) => (
+              <li key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
+                <span style={{ color: '#a5f3fc', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginTop: '0.5rem' }}>
+            Click to open →
+          </span>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function PlainCard({ title, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ height: '160px' }}
+      className="group w-full text-left bg-white dark:bg-amber-50 rounded-2xl border border-gray-100 dark:border-amber-100 shadow-sm hover:scale-[1.06] hover:shadow-2xl hover:border-brand-300 dark:hover:border-brand-400 active:scale-[0.97] transition-all duration-200 p-6 flex flex-col items-start gap-4"
+    >
+      <p className="text-base font-extrabold tracking-tight text-gray-900 dark:text-gray-900 group-hover:text-brand-600 dark:group-hover:text-brand-700 transition-colors leading-snug">
+        {title}
+      </p>
+      <span className="mt-auto text-xs font-medium text-gray-400 dark:text-gray-500 group-hover:text-brand-500 dark:group-hover:text-brand-600 group-hover:translate-x-1 transition-all duration-200">
+        Let's automate →
+      </span>
+    </button>
+  );
+}
 
 export default function DashboardHome({ onNavigate }) {
   return (
@@ -20,26 +114,19 @@ export default function DashboardHome({ onNavigate }) {
 
       {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {CARDS.map(({ page, title }) => (
-          <button
-            key={page}
-            type="button"
-            onClick={() => onNavigate(page)}
-            className="group w-full text-left bg-white dark:bg-amber-50 rounded-2xl border border-gray-100 dark:border-amber-100 shadow-sm hover:scale-[1.06] hover:shadow-2xl hover:border-brand-300 dark:hover:border-brand-400 active:scale-[0.97] transition-all duration-200 p-6 flex flex-col items-start gap-4"
-          >
-            <p className="text-base font-extrabold tracking-tight text-gray-900 group-hover:text-brand-600 dark:text-gray-900 dark:group-hover:text-brand-700 transition-colors leading-snug">
-              {title}
-            </p>
-            <span className="mt-auto text-xs font-medium text-gray-400 dark:text-gray-500 group-hover:text-brand-500 dark:group-hover:text-brand-600 group-hover:translate-x-1 transition-all duration-200">
-              Let's automate →
-            </span>
-          </button>
-        ))}
+        <FlipCard
+          title="Networks & Port Profiles"
+          backItems={NETWORKS_BACK_ITEMS}
+          onClick={() => onNavigate('networks')}
+        />
+        <PlainCard title="Bounce Ports"    onClick={() => onNavigate('bounce-port')} />
+        <PlainCard title="Virtual Chassis" onClick={() => onNavigate('virtual-chassis')} />
       </div>
 
     </div>
   );
 }
+
 
 
 
