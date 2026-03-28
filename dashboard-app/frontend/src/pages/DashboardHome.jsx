@@ -248,9 +248,9 @@ function useInventoryStats() {
 
 // ── Per-device-type inventory card ───────────────────────────────────────────
 const INV_CARDS = [
-  { key: 'standalone', label: 'Standalone Switches', icon: '🔌', accent: '#3b82f6', bg: 'bg-blue-50 dark:bg-blue-900/20',     border: 'border-blue-200 dark:border-blue-800' },
-  { key: 'vc',         label: 'VC Switches',         icon: '🔗', accent: '#8b5cf6', bg: 'bg-violet-50 dark:bg-violet-900/20', border: 'border-violet-200 dark:border-violet-800' },
-  { key: 'ap',         label: 'Access Points',       icon: '📡', accent: '#f59e0b', bg: 'bg-amber-50 dark:bg-amber-900/20',   border: 'border-amber-200 dark:border-amber-800' },
+  { key: 'standalone', label: 'Standalone Switches', icon: '🔌', accent: '#2563eb', labelColor: '#1e40af', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#2563eb' },
+  { key: 'vc',         label: 'VC Switches',         icon: '🔗', accent: '#7c3aed', labelColor: '#5b21b6', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#7c3aed' },
+  { key: 'ap',         label: 'Access Points',       icon: '📡', accent: '#d97706', labelColor: '#92400e', connColor: '#16a34a', discColor: '#dc2626', borderTop: '#d97706' },
 ];
 
 function InventoryPanel() {
@@ -282,16 +282,18 @@ function InventoryPanel() {
       )}
 
       {/* Cards */}
-      {INV_CARDS.map(({ key, label, icon, accent, bg, border }) => {
+      {INV_CARDS.map(({ key, label, icon, accent, labelColor, connColor, discColor, borderTop }) => {
         const d = data?.[key];
         const total        = loading && !d ? null : (d?.total        ?? 0);
         const connected    = loading && !d ? null : (d?.connected    ?? 0);
         const disconnected = loading && !d ? null : (d?.disconnected ?? 0);
         return (
-          <div key={key} className={`rounded-2xl border shadow-sm px-5 py-4 ${bg} ${border}`}>
+          <div key={key}
+            className="rounded-2xl bg-white dark:bg-gray-800 shadow-md px-5 py-4"
+            style={{ borderTop: `4px solid ${borderTop}`, border: `1px solid #e5e7eb`, borderTopWidth: '4px', borderTopColor: borderTop }}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl leading-none">{icon}</span>
-              <p className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-tight leading-tight">{label}</p>
+              <p className="text-xs font-bold tracking-tight leading-tight" style={{ color: labelColor }}>{label}</p>
             </div>
             <p className="text-4xl font-extrabold leading-none mb-3" style={{ color: accent }}>
               {total === null ? '—' : total}
@@ -302,7 +304,7 @@ function InventoryPanel() {
                   <span className="w-2 h-2 rounded-full bg-green-500 inline-block flex-shrink-0" />
                   Connected
                 </span>
-                <span className="font-bold text-green-600 dark:text-green-400">
+                <span className="font-bold" style={{ color: connColor }}>
                   {connected === null ? '…' : connected}
                 </span>
               </div>
@@ -311,7 +313,7 @@ function InventoryPanel() {
                   <span className="w-2 h-2 rounded-full bg-red-500 inline-block flex-shrink-0" />
                   Disconnected
                 </span>
-                <span className="font-bold text-red-500 dark:text-red-400">
+                <span className="font-bold" style={{ color: discColor }}>
                   {disconnected === null ? '…' : disconnected}
                 </span>
               </div>
