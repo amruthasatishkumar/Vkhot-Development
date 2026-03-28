@@ -74,12 +74,9 @@ function VCAutomationView({ vc, onBack }) {
   async function handleStart() {
     setAutomating(true);
     setRan(true);
-    setSteps([
-      { step: 'Fetch Device Config', ok: null, message: 'Running…' },
-      { step: 'Preprovision VC',     ok: null, message: 'Pending…' },
-    ]);
+    setSteps([]);
     try {
-      const res  = await fetch('/api/networks/vc-automate', {
+      const res = await fetch('/api/networks/vc-automate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -88,11 +85,38 @@ function VCAutomationView({ vc, onBack }) {
           vc_mac:    vc.vc_mac,
         }),
       });
-      const data = await res.json();
+
       if (!res.ok) {
+        const data = await res.json();
         setSteps([{ step: 'Automation', ok: false, message: data.error || 'Automation failed.' }]);
-      } else {
-        setSteps(data.steps);
+        return;
+      }
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete trailing fragment
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const step = JSON.parse(line);
+            setSteps((prev) => {
+              const idx = prev.findIndex((s) => s.step === step.step);
+              if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = step;
+                return updated;
+              }
+              return [...prev, step];
+            });
+          } catch { /* ignore malformed line */ }
+        }
       }
     } catch {
       setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);

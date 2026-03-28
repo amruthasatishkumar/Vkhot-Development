@@ -542,9 +542,8 @@ async function renumberVC(siteId, deviceId) {
  * @param {string} deviceId
  * @param {Array}  members  - from listVirtualChassis()
  */
-async function automateVC(siteId, deviceId, members) {
+async function automateVC(siteId, deviceId, members, emit) {
   await validateToken();
-  const steps = [];
 
   // ── Step 1: Fetch current device config (pre-flight) ────────────────────
   let deviceConfig;
@@ -557,10 +556,10 @@ async function automateVC(siteId, deviceId, members) {
       throw new Error(`Failed to fetch device config (${res.status}): ${text}`);
     }
     deviceConfig = await res.json();
-    steps.push({ step: 'Fetch Device Config', ok: true, message: 'Device config retrieved successfully' });
+    emit({ step: 'Fetch Device Config', ok: true, message: 'Device config retrieved successfully' });
   } catch (err) {
-    steps.push({ step: 'Fetch Device Config', ok: false, message: err.message });
-    return steps;
+    emit({ step: 'Fetch Device Config', ok: false, message: err.message });
+    return;
   }
 
   // ── Step 2: Preprovision VC ───────────────────────────────────────────
@@ -577,44 +576,42 @@ async function automateVC(siteId, deviceId, members) {
 
   let justProvisioned = false;
   if (alreadyPreprovisioned && !rolesAreWrong) {
-    steps.push({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned with correct roles — no changes pushed' });
+    emit({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned with correct roles — no changes pushed' });
   } else {
     const reason = rolesAreWrong
       ? 'VC is preprovisioned but has no routing-engine roles — re-pushing with correct roles'
       : 'VC is not preprovisioned — pushing config';
     try {
       await preprovisionVC(siteId, deviceId, members);
-      steps.push({ step: 'Preprovision VC', ok: true, message: `${reason}. Pushed successfully to Mist` });
+      emit({ step: 'Preprovision VC', ok: true, message: `${reason}. Pushed successfully to Mist` });
       justProvisioned = true;
     } catch (err) {
-      steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
-      return steps; // Cannot safely renumber if preprovision failed
+      emit({ step: 'Preprovision VC', ok: false, message: err.message });
+      return; // Cannot safely renumber if preprovision failed
     }
   }
 
   // ── Step 3: Wait 2 minutes after a fresh preprovision ─────────────────
   if (justProvisioned) {
     const WAIT_MS = 2 * 60 * 1000; // 2 minutes
-    steps.push({ step: 'Waiting for Mist to apply preprovision', ok: true, message: 'Waiting 2 minutes before renumber to allow Mist to push the preprovision config to device…' });
+    emit({ step: 'Waiting for Mist to apply preprovision', ok: null, message: 'Waiting 2 minutes before renumber to allow Mist to push the preprovision config to device…' });
     await new Promise((resolve) => setTimeout(resolve, WAIT_MS));
+    emit({ step: 'Waiting for Mist to apply preprovision', ok: true, message: 'Wait complete — proceeding to renumber' });
   }
 
   // ── Step 4: Renumber VC (swap fpc0 ↔ fpc1) ───────────────────────────
   try {
     await renumberVC(siteId, deviceId);
-    steps.push({
+    emit({
       step:    'Renumber VC (fpc0 ↔ fpc1)',
       ok:      true,
       message: 'fpc0 and fpc1 member IDs swapped successfully. Note: port profile assignments are not auto-updated after renumbering — verify them in Mist.',
     });
   } catch (err) {
-    steps.push({ step: 'Renumber VC (fpc0 ↔ fpc1)', ok: false, message: err.message });
-    return steps;
+    emit({ step: 'Renumber VC (fpc0 ↔ fpc1)', ok: false, message: err.message });
   }
 
   // Future steps go here
-
-  return steps;
 }
 
 const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;

@@ -157,25 +157,33 @@ router.get('/virtual-chassis', async (_req, res) => {
 
 // POST /api/networks/vc-automate
 // Body: { site_id, device_id, vc_mac }
-// Runs all VC automation steps sequentially; returns { steps: [{ step, ok, message }] }
+// Streams each step result as NDJSON (one JSON line per step) as they complete.
 router.post('/vc-automate', async (req, res) => {
   const { site_id, device_id, vc_mac } = req.body;
 
-  if (!site_id  || typeof site_id  !== 'string' || !site_id.trim())  return res.status(400).json({ error: 'site_id is required.' });
+  if (!site_id   || typeof site_id   !== 'string' || !site_id.trim())   return res.status(400).json({ error: 'site_id is required.' });
   if (!device_id || typeof device_id !== 'string' || !device_id.trim()) return res.status(400).json({ error: 'device_id is required.' });
-  if (!vc_mac   || typeof vc_mac   !== 'string' || !vc_mac.trim())   return res.status(400).json({ error: 'vc_mac is required.' });
+  if (!vc_mac    || typeof vc_mac    !== 'string' || !vc_mac.trim())    return res.status(400).json({ error: 'vc_mac is required.' });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+
+  const emit = (step) => res.write(JSON.stringify(step) + '\n');
 
   try {
-    // Fetch current member list so backend can derive roles
     const vcs = await listVirtualChassis();
     const vc  = vcs.find((v) => v.vc_mac === vc_mac.trim());
-    if (!vc) return res.status(404).json({ error: `No Virtual Chassis found with vc_mac ${vc_mac}.` });
-
-    const steps = await automateVC(site_id.trim(), device_id.trim(), vc.members);
-    res.json({ steps });
+    if (!vc) {
+      emit({ step: 'Automation', ok: false, message: `No Virtual Chassis found with vc_mac ${vc_mac}.` });
+      res.end();
+      return;
+    }
+    await automateVC(site_id.trim(), device_id.trim(), vc.members, emit);
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    emit({ step: 'Automation', ok: false, message: err.message });
   }
+  res.end();
 });
 
 // GET /api/networks/vc-debug — raw diagnostic data for VC troubleshooting
