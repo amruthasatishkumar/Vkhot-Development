@@ -160,26 +160,28 @@ function useRunsInProgress() {
     function read() {
       const result = [];
 
-      // Bounce Port — localStorage
-      try {
-        const saved = JSON.parse(localStorage.getItem('bounce_session'));
-        if (saved && saved.endTime > Date.now()) {
-          const totalSecs = saved.durationMins * 60;
-          const remaining = Math.max(0, (saved.endTime - Date.now()) / 1000);
-          const pct       = Math.min(99, Math.round(((totalSecs - remaining) / totalSecs) * 100));
-          const remMins   = Math.floor(remaining / 60);
-          const remSecs   = Math.round(remaining % 60);
-          result.push({
-            key:    'bounce',
-            label:  'Bounce Port',
-            sub:    saved.switchInfo?.name || 'Running',
-            pct,
-            detail: `${remMins}m ${String(remSecs).padStart(2, '0')}s remaining`,
-            color:  '#10b981',
-            track:  '#d1fae5',
-          });
-        }
-      } catch { /* ignore */ }
+      // Bounce Port — localStorage (3 switches)
+      ['bounce_session_1', 'bounce_session_2', 'bounce_session_3'].forEach((storageKey, idx) => {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey));
+          if (saved && saved.endTime > Date.now()) {
+            const totalSecs = saved.durationMins * 60;
+            const remaining = Math.max(0, (saved.endTime - Date.now()) / 1000);
+            const pct       = Math.min(99, Math.round(((totalSecs - remaining) / totalSecs) * 100));
+            const remMins   = Math.floor(remaining / 60);
+            const remSecs   = Math.round(remaining % 60);
+            result.push({
+              key:    `bounce_${idx + 1}`,
+              label:  `Bounce – Switch ${idx + 1}`,
+              sub:    saved.switchInfo?.name || 'Running',
+              pct,
+              detail: `${remMins}m ${String(remSecs).padStart(2, '0')}s remaining`,
+              color:  '#10b981',
+              track:  '#d1fae5',
+            });
+          }
+        } catch { /* ignore */ }
+      });
 
       // VC Automation — sessionStorage
       try {
@@ -215,8 +217,10 @@ function useRunsInProgress() {
 
 // Static slot definitions — always shown
 const RUN_SLOTS = [
-  { key: 'bounce', label: 'Bounce Port',     page: 'bounce-port',      idleColor: '#10b981', idleTrack: '#d1fae5' },
-  { key: 'vc',     label: 'Virtual Chassis', page: 'virtual-chassis',  idleColor: '#6366f1', idleTrack: '#e0e7ff' },
+  { key: 'bounce_1', label: 'Bounce – Switch 1', page: 'bounce-port', idleColor: '#10b981', idleTrack: '#d1fae5' },
+  { key: 'bounce_2', label: 'Bounce – Switch 2', page: 'bounce-port', idleColor: '#10b981', idleTrack: '#d1fae5' },
+  { key: 'bounce_3', label: 'Bounce – Switch 3', page: 'bounce-port', idleColor: '#10b981', idleTrack: '#d1fae5' },
+  { key: 'vc',       label: 'Virtual Chassis',   page: 'virtual-chassis', idleColor: '#6366f1', idleTrack: '#e0e7ff' },
 ];
 
 // ── Runs In Progress section ─────────────────────────────────────────────────
