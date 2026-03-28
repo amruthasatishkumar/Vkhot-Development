@@ -565,19 +565,28 @@ async function automateVC(siteId, deviceId, members) {
     deviceConfig.preprovisioned === true ||
     (deviceConfig.virtual_chassis && deviceConfig.virtual_chassis.preprovisioned === true);
 
+  let justProvisioned = false;
   if (alreadyPreprovisioned) {
     steps.push({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned — no changes pushed' });
   } else {
     try {
       await preprovisionVC(siteId, deviceId, members);
       steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
+      justProvisioned = true;
     } catch (err) {
       steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
       return steps; // Cannot safely renumber if preprovision failed
     }
   }
 
-  // ── Step 3: Renumber VC (swap fpc0 ↔ fpc1) ──────────────────────────────
+  // ── Step 3: Wait 2 minutes after a fresh preprovision ─────────────────
+  if (justProvisioned) {
+    const WAIT_MS = 2 * 60 * 1000; // 2 minutes
+    steps.push({ step: 'Waiting for Mist to apply preprovision', ok: true, message: 'Waiting 2 minutes before renumber to allow Mist to push the preprovision config to device…' });
+    await new Promise((resolve) => setTimeout(resolve, WAIT_MS));
+  }
+
+  // ── Step 4: Renumber VC (swap fpc0 ↔ fpc1) ───────────────────────────
   try {
     await renumberVC(siteId, deviceId);
     steps.push({
