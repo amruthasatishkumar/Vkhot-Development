@@ -78,7 +78,9 @@ function VCAutomationView({ vc, onBack }) {
   });
   const [refreshing,  setRefreshing]  = useState(false);
   const [refreshErr,  setRefreshErr]  = useState('');
-  const abortRef = useRef(null);
+  const abortRef   = useRef(null);
+  const readerRef  = useRef(null);
+  const stoppedRef = useRef(false);
 
   useEffect(() => { sessionStorage.setItem('vc:steps',     JSON.stringify(steps));           }, [steps]);
   useEffect(() => { sessionStorage.setItem('vc:ran',       ran       ? 'true' : 'false'); }, [ran]);
@@ -103,12 +105,16 @@ function VCAutomationView({ vc, onBack }) {
   }
 
   function handleStop() {
-    if (abortRef.current) abortRef.current.abort();
+    stoppedRef.current = true;                          // set flag first
+    try { readerRef.current?.cancel(); } catch {}       // kill the stream reader
+    try { abortRef.current?.abort(); }  catch {}        // also abort the fetch
   }
 
   async function handleStart() {
+    stoppedRef.current = false;
     const controller = new AbortController();
     abortRef.current = controller;
+    readerRef.current = null;
     setAutomating(true);
     setCompleted(false);
     setRan(true);
@@ -132,15 +138,21 @@ function VCAutomationView({ vc, onBack }) {
       }
 
       const reader  = res.body.getReader();
+      readerRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = '';
 
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        let done, value;
+        try {
+          ({ done, value } = await reader.read());
+        } catch {
+          break; // reader cancelled or fetch aborted
+        }
+        if (done || stoppedRef.current) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop(); // keep incomplete trailing fragment
+        buffer = lines.pop();
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
@@ -157,8 +169,13 @@ function VCAutomationView({ vc, onBack }) {
           } catch { /* ignore malformed line */ }
         }
       }
+
+      // Append a visible stopped entry if the user hit Stop
+      if (stoppedRef.current) {
+        setSteps((prev) => [...prev, { step: 'Stopped', ok: false, message: 'Automation was stopped by user.' }]);
+      }
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (stoppedRef.current || err.name === 'AbortError') {
         setSteps((prev) => [...prev, { step: 'Stopped', ok: false, message: 'Automation was stopped by user.' }]);
       } else {
         setSteps([{ step: 'Automation', ok: false, message: 'Could not reach backend.' }]);

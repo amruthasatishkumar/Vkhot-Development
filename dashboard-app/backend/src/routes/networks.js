@@ -169,7 +169,15 @@ router.post('/vc-automate', async (req, res) => {
   res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('Cache-Control', 'no-cache');
 
-  const emit = (step) => res.write(JSON.stringify(step) + '\n');
+  // Track client disconnect so backend waits can be interrupted immediately
+  let cancelled = false;
+  req.on('close', () => { cancelled = true; });
+  const isCancelled = () => cancelled;
+
+  const emit = (step) => {
+    if (cancelled) return; // don't write to a closed socket
+    res.write(JSON.stringify(step) + '\n');
+  };
 
   try {
     const vcs = await listVirtualChassis();
@@ -179,11 +187,11 @@ router.post('/vc-automate', async (req, res) => {
       res.end();
       return;
     }
-    await automateVC(site_id.trim(), device_id.trim(), vc.members, emit);
+    await automateVC(site_id.trim(), device_id.trim(), vc.members, emit, isCancelled);
   } catch (err) {
     emit({ step: 'Automation', ok: false, message: err.message });
   }
-  res.end();
+  if (!res.writableEnded) res.end();
 });
 
 // GET /api/networks/vc-debug — raw diagnostic data for VC troubleshooting

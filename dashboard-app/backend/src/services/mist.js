@@ -656,7 +656,28 @@ async function changeRoleFpc0(siteId, deviceId) {
  * @param {string} deviceId
  * @param {Array}  members  - from listVirtualChassis()
  */
-async function automateVC(siteId, deviceId, members, emit) {
+
+// Resolves after `ms` milliseconds, but rejects early (with .cancelled=true)
+// if isCancelled() returns true (checked every 500 ms).
+function abortableWait(ms, isCancelled) {
+  return new Promise((resolve, reject) => {
+    const poll = setInterval(() => {
+      if (isCancelled()) {
+        clearInterval(poll);
+        clearTimeout(timer);
+        const err = new Error('Automation cancelled by user');
+        err.cancelled = true;
+        reject(err);
+      }
+    }, 500);
+    const timer = setTimeout(() => {
+      clearInterval(poll);
+      resolve();
+    }, ms);
+  });
+}
+
+async function automateVC(siteId, deviceId, members, emit, isCancelled = () => false) {
   await validateToken();
 
   // ── Step 1: Fetch current device config (pre-flight) ────────────────────
@@ -709,7 +730,15 @@ async function automateVC(siteId, deviceId, members, emit) {
   if (justProvisioned) {
     const WAIT_MS = 2 * 60 * 1000; // 2 minutes
     emit({ step: 'Waiting for Mist to apply preprovision', ok: null, message: 'Waiting 2 minutes before renumber to allow Mist to push the preprovision config to device…' });
-    await new Promise((resolve) => setTimeout(resolve, WAIT_MS));
+    try {
+      await abortableWait(WAIT_MS, isCancelled);
+    } catch (err) {
+      if (err.cancelled) {
+        emit({ step: 'Waiting for Mist to apply preprovision', ok: false, message: 'Automation stopped by user during wait.' });
+        return;
+      }
+      throw err;
+    }
     emit({ step: 'Waiting for Mist to apply preprovision', ok: true, message: 'Wait complete — proceeding to renumber' });
   }
 
@@ -729,7 +758,15 @@ async function automateVC(siteId, deviceId, members, emit) {
   // ── Step 5: Wait 5 minutes after renumber ─────────────────────────────
   const RENUMBER_WAIT_MS = 5 * 60 * 1000; // 5 minutes
   emit({ step: 'Waiting for Mist to apply renumber', ok: null, message: 'Waiting 5 minutes after renumber before changing fpc0 role to allow Mist to stabilise the VC…' });
-  await new Promise((resolve) => setTimeout(resolve, RENUMBER_WAIT_MS));
+  try {
+    await abortableWait(RENUMBER_WAIT_MS, isCancelled);
+  } catch (err) {
+    if (err.cancelled) {
+      emit({ step: 'Waiting for Mist to apply renumber', ok: false, message: 'Automation stopped by user during wait.' });
+      return;
+    }
+    throw err;
+  }
   emit({ step: 'Waiting for Mist to apply renumber', ok: true, message: 'Wait complete — proceeding to role change' });
 
   // ── Step 6: Change role of fpc0 ────────────────────────────────────────
