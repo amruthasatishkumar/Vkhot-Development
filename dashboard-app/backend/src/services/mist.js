@@ -347,15 +347,29 @@ async function listVirtualChassis() {
         const vcMembers = deviceData.virtual_chassis && Array.isArray(deviceData.virtual_chassis.members)
           ? deviceData.virtual_chassis.members
           : [];
+        // Build mac → { vc_role, member_id } lookup from the device config payload
         const roleByMac = {};
         for (const m of vcMembers) {
-          if (m.mac) roleByMac[normaliseMac(m.mac)] = (m.vc_role || 'unknown').toLowerCase();
+          if (m.mac) roleByMac[normaliseMac(m.mac)] = {
+            vc_role:   (m.vc_role || 'unknown').toLowerCase(),
+            member_id: m.member_id ?? null,
+          };
         }
         for (const member of vc.members) {
-          const role = roleByMac[normaliseMac(member.mac)];
-          if (role) member.vc_role = role;
+          const info = roleByMac[normaliseMac(member.mac)];
+          if (info) {
+            member.vc_role   = info.vc_role;
+            member.member_id = info.member_id; // carry member_id for ordering
+          }
         }
-        console.log(`[Mist] Role enrichment for VC ${vc.vc_mac}:`, vc.members.map(m => `${m.mac}=${m.vc_role}`));
+        // Re-order members to match the device API order (by member_id = Mist dashboard order).
+        // Members with no member_id fall to the end, preserving their relative order.
+        vc.members.sort((a, b) => {
+          const aId = a.member_id ?? Infinity;
+          const bId = b.member_id ?? Infinity;
+          return aId - bId;
+        });
+        console.log(`[Mist] Role enrichment + order for VC ${vc.vc_mac}:`, vc.members.map(m => `fpc${m.member_id}=${m.mac}/${m.vc_role}`));
       } else {
         console.warn(`[Mist] devices ${deviceRes.status} for VC ${vc.vc_mac} — roles stay as inventory values`);
       }
@@ -424,9 +438,7 @@ async function listVirtualChassis() {
     device_id: vc.device_id,   // virtual chassis logical device ID (mac === vc_mac)
     name:      vc.name,
     site_id:   vc.site_id,
-    members:   vc.members.sort(
-      (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
-    ),
+    members:   vc.members, // preserve original API order (as shown in Mist dashboard)
   }));
 }
 
