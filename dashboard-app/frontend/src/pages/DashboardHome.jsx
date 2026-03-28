@@ -282,11 +282,11 @@ export default function DashboardHome({ onNavigate }) {
     <div className="space-y-8 max-w-3xl">
 
       {/* Top header */}
-      <div className="rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 px-8 py-6 shadow-md relative overflow-hidden">
-        <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute bottom-0 left-1/4 h-16 w-16 rounded-full bg-white/10 blur-xl" />
+      <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-zinc-800 px-8 py-6 shadow-md relative overflow-hidden">
+        <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
+        <div className="absolute bottom-0 left-1/4 h-16 w-16 rounded-full bg-white/5 blur-xl" />
         <p className="text-5xl font-extrabold text-white tracking-tight leading-tight relative">Dashboard</p>
-        <p className="text-base text-teal-100 mt-2 relative">Pick a tool below to get started — everything you need is one click away.</p>
+        <p className="text-base text-slate-300 mt-2 relative">Pick a tool below to get started — everything you need is one click away.</p>
       </div>
 
       {/* Cards */}
