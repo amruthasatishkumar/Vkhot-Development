@@ -442,7 +442,34 @@ async function listVirtualChassis() {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC };
+/**
+ * Create an org-level network (switch) template.
+ *
+ * @param {string} orgId
+ * @param {string} name  - Display name for the template
+ * @returns {object}     - Created template object from Mist API
+ */
+async function createOrgNetworkTemplate(orgId, name) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/orgs/${orgId}/networktemplates`;
+  console.log(`[Mist] POST ${url} (create network template: ${name})`);
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ name }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mist create network template failed (${res.status}): ${text}`);
+  }
+
+  const text = await res.text();
+  return text ? JSON.parse(text) : { ok: true };
+}
+
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, changeRoleFpc0, switchoverRoutingEngine, automateVC, createOrgNetworkTemplate };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {

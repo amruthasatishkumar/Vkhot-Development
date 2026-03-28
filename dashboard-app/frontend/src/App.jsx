@@ -3,9 +3,10 @@ import DashboardHome from './pages/DashboardHome.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import BouncePortPage from './pages/BouncePortPage.jsx';
 import VirtualChassisPage from './pages/VirtualChassisPage.jsx';
+import SwitchTemplatePage from './pages/SwitchTemplatePage.jsx';
 import Sidebar from './components/Sidebar.jsx';
 
-const VALID_PAGES = ['home', 'networks', 'bounce-port', 'virtual-chassis'];
+const VALID_PAGES = ['home', 'networks', 'bounce-port', 'virtual-chassis', 'switch-template'];
 
 function pageFromHash() {
   const hash = window.location.hash.replace('#', '');
@@ -51,6 +52,7 @@ export default function App() {
         <div className={page !== 'networks'         ? 'hidden' : ''}><Dashboard /></div>
         <div className={page !== 'bounce-port'      ? 'hidden' : ''}><BouncePortPage onBounceStatusChange={setBounceActive} /></div>
         <div className={page !== 'virtual-chassis'  ? 'hidden' : ''}><VirtualChassisPage onVcStatusChange={setVcActive} /></div>
+        <div className={page !== 'switch-template'  ? 'hidden' : ''}><SwitchTemplatePage /></div>
       </main>
     </div>
   );

@@ -3,6 +3,7 @@ const NAV_ITEMS = [
   { label: 'Networks & Port Profiles', icon: '🌐', page: 'networks' },
   { label: 'Bounce Port',              icon: '🔄', page: 'bounce-port' },
   { label: 'Virtual Chassis',          icon: '🔗', page: 'virtual-chassis' },
+  { label: 'Switch Template',          icon: '📋', page: 'switch-template' },
 ];
 
 export default function Sidebar({ dark, onToggleDark, activePage, onNavigate, bounceActive, vcActive }) {

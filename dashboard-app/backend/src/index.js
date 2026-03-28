@@ -33,10 +33,12 @@ app.get('/health', (_req, res) => {
 // Initialise DB first, then mount routes and start listening
 init()
   .then(() => {
-    const apiRoutes      = require('./routes/api');
-    const networkRoutes  = require('./routes/networks');
+    const apiRoutes             = require('./routes/api');
+    const networkRoutes         = require('./routes/networks');
+    const switchTemplateRoutes  = require('./routes/switch-templates');
     app.use('/api', apiRoutes);
     app.use('/api/networks', networkRoutes);
+    app.use('/api/switch-templates', switchTemplateRoutes);
     app.listen(PORT, () => {
       console.log(`Backend running at http://localhost:${PORT}`);
     });
