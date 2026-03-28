@@ -171,13 +171,14 @@ function useRunsInProgress() {
             const remMins   = Math.floor(remaining / 60);
             const remSecs   = Math.round(remaining % 60);
             result.push({
-              key:    `bounce_${idx + 1}`,
-              label:  `Bounce – Switch ${idx + 1}`,
-              sub:    saved.switchInfo?.name || 'Running',
+              key:         `bounce_${idx + 1}`,
+              label:       `Bounce – Switch ${idx + 1}`,
+              sub:         saved.switchInfo?.name || 'Running',
               pct,
-              detail: `${remMins}m ${String(remSecs).padStart(2, '0')}s remaining`,
-              color:  '#10b981',
-              track:  '#d1fae5',
+              detail:      `${remMins}m ${String(remSecs).padStart(2, '0')}s remaining`,
+              bounceCount: saved.bounceCount || 0,
+              color:       '#10b981',
+              track:       '#d1fae5',
             });
           }
         } catch { /* ignore */ }
@@ -272,6 +273,11 @@ function RunsInProgress({ runs, onNavigate }) {
                 <>
                   <p className="text-xs text-gray-500 dark:text-gray-400 text-center truncate max-w-[120px]">{run.sub}</p>
                   <p className="text-xs font-semibold text-center" style={{ color: run.color }}>{run.detail}</p>
+                  {run.bounceCount != null && (
+                    <p className="text-xs font-bold text-center" style={{ color: run.color }}>
+                      {run.bounceCount} bounce{run.bounceCount !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-xs text-gray-300 dark:text-gray-600 text-center">Not running</p>
