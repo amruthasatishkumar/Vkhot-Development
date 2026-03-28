@@ -113,18 +113,18 @@ function PlainCard({ title, onClick }) {
 }
 
 // ── SVG Donut Chart ─────────────────────────────────────────────────────────
-function DonutChart({ pct, color, trackColor = '#e5e7eb', size = 110, idle = false }) {
-  const r = 42;
+function DonutChart({ pct, color, trackColor = '#e5e7eb', size = 200, idle = false }) {
+  const r = 40;
   const circ = 2 * Math.PI * r;
   const dash = idle ? 0 : Math.max(0, Math.min(1, pct / 100)) * circ;
   const ringColor = idle ? '#d1d5db' : color;
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: 'block' }}>
-      <circle cx="50" cy="50" r={r} fill="none" stroke={idle ? '#f3f4f6' : trackColor} strokeWidth="11" />
+      <circle cx="50" cy="50" r={r} fill="none" stroke={idle ? '#f3f4f6' : trackColor} strokeWidth="13" />
       <circle
         cx="50" cy="50" r={r} fill="none"
         stroke={ringColor}
-        strokeWidth="11"
+        strokeWidth="13"
         strokeLinecap="round"
         strokeDasharray={`${dash} ${circ}`}
         transform="rotate(-90 50 50)"
@@ -132,15 +132,15 @@ function DonutChart({ pct, color, trackColor = '#e5e7eb', size = 110, idle = fal
       />
       {idle ? (
         <>
-          <text x="50" y="44" textAnchor="middle" fontSize="8" fontWeight="700" fill="#9ca3af">No active</text>
-          <text x="50" y="57" textAnchor="middle" fontSize="8" fontWeight="700" fill="#9ca3af">run</text>
+          <text x="50" y="46" textAnchor="middle" fontSize="9" fontWeight="700" fill="#9ca3af">No active</text>
+          <text x="50" y="58" textAnchor="middle" fontSize="9" fontWeight="700" fill="#9ca3af">run</text>
         </>
       ) : (
         <>
-          <text x="50" y="46" textAnchor="middle" fontSize="19" fontWeight="800" fill={color}>
+          <text x="50" y="44" textAnchor="middle" fontSize="22" fontWeight="800" fill={color}>
             {pct}%
           </text>
-          <text x="50" y="62" textAnchor="middle" fontSize="9" fontWeight="500" fill="#9ca3af">
+          <text x="50" y="60" textAnchor="middle" fontSize="9" fontWeight="600" fill="#9ca3af">
             complete
           </text>
         </>
@@ -242,7 +242,7 @@ function RunsInProgress({ runs, onNavigate }) {
           </span>
         )}
       </div>
-      <div className="flex gap-8 flex-wrap">
+      <div className="flex gap-12 flex-wrap">
         {RUN_SLOTS.map((slot) => {
           const run  = runs.find((r) => r.key === slot.key);
           const live = Boolean(run);
