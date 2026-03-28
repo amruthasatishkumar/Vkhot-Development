@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate, updateOrgNetworkTemplatePortProfiles } = require('../services/mist');
+const { createOrgNetworkTemplate, getOrgNetworkTemplate, updateOrgNetworkTemplate, deleteOrgNetworkTemplateNetworks, deleteOrgNetworkTemplate, updateOrgNetworkTemplatePortProfiles, deleteOrgNetworkTemplatePortProfiles } = require('../services/mist');
 
 const router = express.Router();
 
@@ -137,6 +137,22 @@ router.put('/:id/port-profiles', async (req, res) => {
 
   try {
     const result = await updateOrgNetworkTemplatePortProfiles(process.env.MIST_ORG_ID, id, profilesMap);
+    res.json(result);
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });
+  }
+});
+
+// DELETE /api/switch-templates/:id/port-profiles
+// Body: { names: [string] } — removes named port profiles from template.
+router.delete('/:id/port-profiles', async (req, res) => {
+  const { id } = req.params;
+  const { names } = req.body;
+  if (!Array.isArray(names) || names.length === 0) {
+    return res.status(400).json({ error: 'names must be a non-empty array of profile name strings.' });
+  }
+  try {
+    const result = await deleteOrgNetworkTemplatePortProfiles(process.env.MIST_ORG_ID, id, names);
     res.json(result);
   } catch (err) {
     res.status(err.message.includes('not found') ? 404 : 502).json({ error: err.message });

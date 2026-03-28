@@ -308,6 +308,15 @@ function PortProfilesTab({ templateId }) {
   const [success,   setSuccess]   = useState(null);
   const [apiError,  setApiError]  = useState('');
 
+  // Delete state
+  const [delCount,    setDelCount]    = useState('');
+  const [delCountErr, setDelCountErr] = useState('');
+  const [delPreview,  setDelPreview]  = useState([]);
+  const [loadingDel,  setLoadingDel]  = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
+  const [delSuccess,  setDelSuccess]  = useState(null);
+  const [delApiError, setDelApiError] = useState('');
+
   useEffect(() => {
     async function load() {
       setLoadingNets(true);
@@ -378,6 +387,44 @@ function PortProfilesTab({ templateId }) {
       setApiError(err.message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handlePreviewDelete() {
+    setDelCountErr(''); setDelSuccess(null); setDelApiError(''); setDelPreview([]);
+    const n = parseInt(delCount, 10);
+    if (!delCount || isNaN(n) || n < 1) { setDelCountErr('Enter a number greater than 0.'); return; }
+    setLoadingDel(true);
+    try {
+      const res  = await fetch(`/api/switch-templates/${templateId}/port-profiles`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch port profiles.');
+      const all = data.profiles || [];
+      if (all.length === 0) { setDelCountErr('No port profiles exist on this template to delete.'); return; }
+      setDelPreview(all.slice(0, n));
+    } catch (err) {
+      setDelApiError(err.message);
+    } finally {
+      setLoadingDel(false);
+    }
+  }
+
+  async function handleDeleteProfiles() {
+    setDeleting(true); setDelApiError(''); setDelSuccess(null);
+    try {
+      const res = await fetch(`/api/switch-templates/${templateId}/port-profiles`, {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ names: delPreview.map((p) => p.name) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete port profiles.');
+      setDelSuccess({ count: delPreview.length, names: delPreview.map((p) => p.name) });
+      setDelPreview([]); setDelCount('');
+    } catch (err) {
+      setDelApiError(err.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -517,6 +564,95 @@ function PortProfilesTab({ templateId }) {
           <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{apiError}</p>
         </div>
       )}
+
+      {/* ── Delete section ─────────────────────────────────────────────────────── */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Delete Port Profiles</h3>
+
+        <div className="flex items-end gap-3">
+          <div className="flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              How many profiles to delete?
+            </label>
+            <input
+              type="number" min={1} value={delCount}
+              onChange={(e) => { setDelCount(e.target.value); setDelCountErr(''); setDelSuccess(null); setDelPreview([]); }}
+              placeholder="e.g. 5"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            {delCountErr && <p className="mt-1 text-xs text-red-500">{delCountErr}</p>}
+          </div>
+          <button type="button" onClick={handlePreviewDelete} disabled={loadingDel}
+            className="rounded-lg bg-gray-800 dark:bg-gray-600 hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 transition-colors inline-flex items-center gap-2">
+            {loadingDel ? (<><Spinner /> Fetching…</>) : '🔍 Preview'}
+          </button>
+        </div>
+
+        {delPreview.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Preview — {delPreview.length} profile{delPreview.length > 1 ? 's' : ''} will be removed
+              </p>
+              <button type="button" onClick={handlePreviewDelete}
+                className="text-xs text-red-500 dark:text-red-400 hover:underline">↺ Refresh</button>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-red-200 dark:border-red-800">
+              <table className="w-full text-sm">
+                <thead className="bg-red-50 dark:bg-red-900/20">
+                  <tr>
+                    {['Profile Name', 'Mode', 'Port Network', 'VoIP Network'].map((h) => (
+                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-red-100 dark:divide-red-900/30">
+                  {delPreview.map((p) => (
+                    <tr key={p.name} className="bg-white dark:bg-gray-800">
+                      <td className="px-4 py-2 font-mono text-xs text-gray-800 dark:text-gray-100">{p.name}</td>
+                      <td className="px-4 py-2 text-xs">
+                        <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                          p.mode === 'trunk'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                            : 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'
+                        }`}>
+                          {p.mode}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.port_network}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300">{p.voip_network}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button type="button" onClick={handleDeleteProfiles} disabled={deleting}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 transition-colors">
+              {deleting
+                ? (<><Spinner /> Deleting…</>)
+                : `Delete ${delPreview.length} Profile${delPreview.length > 1 ? 's' : ''} from Template`}
+            </button>
+          </div>
+        )}
+
+        {delSuccess && (
+          <div className="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-3">
+            <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+              ✅ {delSuccess.count} port profile{delSuccess.count > 1 ? 's' : ''} removed from template
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-300 mt-1 font-mono break-all">
+              {delSuccess.names.join(', ')}
+            </p>
+          </div>
+        )}
+
+        {delApiError && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-3">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">❌ Error</p>
+            <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{delApiError}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
