@@ -7,13 +7,12 @@ const NETWORKS_BACK_ITEMS = [
 ];
 
 const BOUNCE_BACK_ITEMS = [
-  'For any specific time you want',
+  'For multiple ports',
+  'For any specific time',
 ];
 
 const VC_BACK_ITEMS = [
-  'Preprovision Virtual Chassis',
-  'Renumber VC members (fpc0 ↔ fpc1)',
-  'Change member roles',
+  'For VC features',
 ];
 
 function FlipCard({ title, backHeader, backItems, onClick }) {
@@ -137,13 +136,13 @@ export default function DashboardHome({ onNavigate }) {
         />
         <FlipCard
           title="Bounce Ports"
-          backHeader="Here you can Bounce multiple ports at once"
+          backHeader="Here you can Continuously Bounce Port"
           backItems={BOUNCE_BACK_ITEMS}
           onClick={() => onNavigate('bounce-port')}
         />
         <FlipCard
           title="Virtual Chassis"
-          backHeader="Here you can Automate Virtual Chassis"
+          backHeader="Here you can run VC automation"
           backItems={VC_BACK_ITEMS}
           onClick={() => onNavigate('virtual-chassis')}
         />
