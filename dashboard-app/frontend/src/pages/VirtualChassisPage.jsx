@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const ROLE_BADGE = {
   master:   'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-700',
@@ -68,11 +68,21 @@ function StepRow({ step }) {
 // ── VC Automation Page (detail + runner) ──────────────────────────────────────
 function VCAutomationView({ vc, onBack }) {
   const [automating,  setAutomating]  = useState(false);
-  const [steps,       setSteps]       = useState([]);
-  const [ran,         setRan]         = useState(false);
-  const [members,     setMembers]     = useState(vc.members);
+  const [steps,       setSteps]       = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('vc:steps')) || []; } catch { return []; }
+  });
+  const [ran,         setRan]         = useState(() => sessionStorage.getItem('vc:ran') === 'true');
+  const [members,     setMembers]     = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('vc:members')) || vc.members; } catch { return vc.members; }
+  });
   const [refreshing,  setRefreshing]  = useState(false);
   const [refreshErr,  setRefreshErr]  = useState('');
+  // True when the page was refreshed mid-run — stream is gone but we show last known results
+  const [streamLost,  setStreamLost]  = useState(() => sessionStorage.getItem('vc:ran') === 'true');
+
+  useEffect(() => { sessionStorage.setItem('vc:steps',   JSON.stringify(steps));      }, [steps]);
+  useEffect(() => { sessionStorage.setItem('vc:ran',     ran ? 'true' : 'false');     }, [ran]);
+  useEffect(() => { sessionStorage.setItem('vc:members', JSON.stringify(members));    }, [members]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -94,6 +104,7 @@ function VCAutomationView({ vc, onBack }) {
   async function handleStart() {
     setAutomating(true);
     setRan(true);
+    setStreamLost(false);
     setSteps([]);
     try {
       const res = await fetch('/api/networks/vc-automate', {
@@ -202,6 +213,17 @@ function VCAutomationView({ vc, onBack }) {
         )}
         <MemberTable members={members} />
       </div>
+
+      {/* Stream-lost notice */}
+      {streamLost && !automating && (
+        <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 px-5 py-3 flex items-start gap-3">
+          <span className="text-yellow-500 text-base mt-0.5">⚠️</span>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            Page was refreshed — live stream disconnected. Showing last known step results.
+            {ran && ' Click “Run Again” to re-run the automation.'}
+          </p>
+        </div>
+      )}
 
       {/* Automation launcher */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
@@ -328,11 +350,30 @@ function VCListView({ onStart }) {
 
 // ── Root component ────────────────────────────────────────────────────────────
 export default function VirtualChassisPage() {
-  const [activeVc, setActiveVc] = useState(null); // null = list view
+  const [activeVc, setActiveVc] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('vc:activeVc')); } catch { return null; }
+  });
+
+  function handleStart(vc) {
+    sessionStorage.setItem('vc:activeVc', JSON.stringify(vc));
+    // Reset persisted automation state for the new VC
+    sessionStorage.removeItem('vc:steps');
+    sessionStorage.removeItem('vc:ran');
+    sessionStorage.removeItem('vc:members');
+    setActiveVc(vc);
+  }
+
+  function handleBack() {
+    sessionStorage.removeItem('vc:activeVc');
+    sessionStorage.removeItem('vc:steps');
+    sessionStorage.removeItem('vc:ran');
+    sessionStorage.removeItem('vc:members');
+    setActiveVc(null);
+  }
 
   return activeVc
-    ? <VCAutomationView vc={activeVc} onBack={() => setActiveVc(null)} />
-    : <VCListView onStart={(vc) => setActiveVc(vc)} />;
+    ? <VCAutomationView vc={activeVc} onBack={handleBack} />
+    : <VCListView onStart={handleStart} />;
 }
 
 
