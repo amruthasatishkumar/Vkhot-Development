@@ -46,13 +46,21 @@ function NetworksTab({ templateId }) {
   const [apiError,  setApiError]  = useState('');
 
   // Delete state
-  const [delCount,    setDelCount]    = useState('');
-  const [delCountErr, setDelCountErr] = useState('');
-  const [delPreview,  setDelPreview]  = useState([]);  // networks fetched from API to preview
-  const [loadingDel,  setLoadingDel]  = useState(false);
-  const [deleting,    setDeleting]    = useState(false);
-  const [delSuccess,  setDelSuccess]  = useState(null);
-  const [delApiError, setDelApiError] = useState('');
+  const [delCount,      setDelCount]      = useState('');
+  const [delCountErr,   setDelCountErr]   = useState('');
+  const [delPreview,    setDelPreview]    = useState([]);
+  const [loadingDel,    setLoadingDel]    = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
+  const [delSuccess,    setDelSuccess]    = useState(null);
+  const [delApiError,   setDelApiError]   = useState('');
+  const [networkCount,  setNetworkCount]  = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/switch-templates/${templateId}/networks`)
+      .then((r) => r.json())
+      .then((d) => { if (d.networks) setNetworkCount(d.networks.length); })
+      .catch(() => {});
+  }, [templateId]);
 
   function handleGenerate() {
     setCountErr(''); setSuccess(null); setApiError('');
@@ -75,6 +83,7 @@ function NetworksTab({ templateId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create networks.');
       setSuccess({ count: generated.length, names: generated.map((n) => n.name) });
+      setNetworkCount((prev) => (prev ?? 0) + generated.length);
       setGenerated([]); setCount('');
     } catch (err) {
       setApiError(err.message);
@@ -113,6 +122,7 @@ function NetworksTab({ templateId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete networks.');
       setDelSuccess({ count: delPreview.length, names: delPreview.map((n) => n.name) });
+      setNetworkCount((prev) => Math.max(0, (prev ?? 0) - delPreview.length));
       setDelPreview([]); setDelCount('');
     } catch (err) {
       setDelApiError(err.message);
@@ -206,7 +216,18 @@ function NetworksTab({ templateId }) {
 
       {/* ── Delete section ───────────────────────────── */}
       <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Delete Networks</h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Delete Networks</h3>
+          {networkCount !== null && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+              networkCount === 0
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-600'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-700'
+            }`}>
+              {networkCount === 0 ? 'No networks on template' : `${networkCount} network${networkCount > 1 ? 's' : ''} available to delete`}
+            </span>
+          )}
+        </div>
 
         {/* Delete input row */}
         <div className="flex items-end gap-3">
@@ -875,7 +896,18 @@ export default function SwitchTemplatePage() {
   const [savedTemplates, setSavedTemplates] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('st:templates')) || []; } catch { return []; }
   });
-  const [activeTemplate,  setActiveTemplate]  = useState(null);
+  const [activeTemplate,  setActiveTemplateState]  = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('st:active-template')) || null; } catch { return null; }
+  });
+
+  function setActiveTemplate(template) {
+    if (template) {
+      sessionStorage.setItem('st:active-template', JSON.stringify(template));
+    } else {
+      sessionStorage.removeItem('st:active-template');
+    }
+    setActiveTemplateState(template);
+  }
   const [deletingId,      setDeletingId]      = useState(null);
   const [deleteError,     setDeleteError]     = useState('');
 
@@ -897,6 +929,10 @@ export default function SwitchTemplatePage() {
       const updated = savedTemplates.filter((t) => t.id !== template.id);
       sessionStorage.setItem('st:templates', JSON.stringify(updated));
       setSavedTemplates(updated);
+      // If the deleted template is currently open, navigate back to the list
+      if (activeTemplate && activeTemplate.id === template.id) {
+        setActiveTemplate(null);
+      }
     } catch (err) {
       setDeleteError(err.message);
     } finally {
