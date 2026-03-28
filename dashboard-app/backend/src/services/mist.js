@@ -329,14 +329,37 @@ async function listVirtualChassis() {
     });
   }
 
-  // Enrich member status via GET /stats/devices/{device_id} on the VC logical device.
-  // The response has module_stat[] — one entry per physical member with mac + status.
+  // Enrich member status + roles via parallel calls on each VC logical device.
+  // - GET /sites/{site_id}/devices/{device_id}        → virtual_chassis.members[].vc_role
+  // - GET /sites/{site_id}/stats/devices/{device_id}  → module_stat[].status
   await Promise.all([...vcMap.values()].map(async (vc) => {
     if (!vc.device_id || !vc.site_id) {
       console.warn(`[Mist] No device_id or site_id for VC ${vc.vc_mac} — status will be unknown`);
       return;
     }
     try {
+      // ── Fetch device config to get actual vc_roles ─────────────────────
+      const deviceUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/devices/${vc.device_id}`;
+      console.log(`[Mist] GET ${deviceUrl} (role enrichment)`);
+      const deviceRes = await fetch(deviceUrl, { headers: mistHeaders() });
+      if (deviceRes.ok) {
+        const deviceData = await deviceRes.json();
+        const vcMembers = deviceData.virtual_chassis && Array.isArray(deviceData.virtual_chassis.members)
+          ? deviceData.virtual_chassis.members
+          : [];
+        const roleByMac = {};
+        for (const m of vcMembers) {
+          if (m.mac) roleByMac[normaliseMac(m.mac)] = (m.vc_role || 'unknown').toLowerCase();
+        }
+        for (const member of vc.members) {
+          const role = roleByMac[normaliseMac(member.mac)];
+          if (role) member.vc_role = role;
+        }
+        console.log(`[Mist] Role enrichment for VC ${vc.vc_mac}:`, vc.members.map(m => `${m.mac}=${m.vc_role}`));
+      } else {
+        console.warn(`[Mist] devices ${deviceRes.status} for VC ${vc.vc_mac} — roles stay as inventory values`);
+      }
+
       const statsUrl = `${BASE_URL}/api/v1/sites/${vc.site_id}/stats/devices/${vc.device_id}`;
       console.log(`[Mist] GET ${statsUrl}`);
       const statsRes = await fetch(statsUrl, { headers: mistHeaders() });
