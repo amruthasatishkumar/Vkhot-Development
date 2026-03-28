@@ -278,17 +278,28 @@ function RunsInProgress({ runs, onNavigate }) {
 
 export default function DashboardHome({ onNavigate }) {
   const runs = useRunsInProgress();
+  const [search, setSearch] = useState('');
   return (
     <div className="space-y-8 max-w-3xl">
 
-      {/* Hero banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 px-8 py-7 shadow-lg relative overflow-hidden">
-        <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute bottom-0 left-1/3 h-20 w-20 rounded-full bg-white/10 blur-xl" />
-        <p className="text-2xl font-extrabold text-white tracking-tight relative">My Automation World</p>
-        <p className="text-sm text-indigo-200 mt-1 relative">
-          Pick a tool below to get started — everything you need is one click away.
-        </p>
+      {/* Top header row */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight">Dashboard</p>
+          <p className="text-sm text-gray-400 dark:text-gray-400 mt-0.5">Pick a tool below to get started — everything you need is one click away.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 w-48 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
+          <svg className="h-4 w-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 outline-none w-full"
+          />
+        </div>
       </div>
 
       {/* Cards */}
