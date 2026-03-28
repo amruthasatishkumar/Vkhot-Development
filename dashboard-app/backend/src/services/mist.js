@@ -346,44 +346,51 @@ async function listVirtualChassis() {
       }
       const statsData = await statsRes.json();
       const moduleStat = Array.isArray(statsData.module_stat) ? statsData.module_stat : [];
+      // Log first module_stat entry so we can see its actual field names
+      if (moduleStat.length > 0) {
+        console.log(`[Mist] module_stat[0] sample:`, JSON.stringify(moduleStat[0]));
+      }
       console.log(`[Mist] module_stat entries: ${moduleStat.length} for VC ${vc.vc_mac}`);
 
-      // Build mac → status lookup from module_stat
+      // Build mac → status lookup from module_stat.
+      // Mist may use 'mac', 'fpc_mac', or serial/idx — try all known fields.
       const liveStatus = {};
       for (const m of moduleStat) {
-        const mac = m.mac || '';
-        if (!mac) continue;
+        const mac = m.mac || m.fpc_mac || m.board_mac || '';
         let s = null;
         if      (m.status === 'connected'    || m.status === 'online')  s = 'connected';
         else if (m.status === 'disconnected' || m.status === 'offline') s = 'disconnected';
         else if (m.up === true  || m.up === 1)                          s = 'connected';
         else if (m.up === false || m.up === 0)                          s = 'disconnected';
-        if (s) liveStatus[normaliseMac(mac)] = s;
+        // If no status fields found, treat presence in module_stat as connected
+        if (!s) s = 'connected';
+        if (mac) liveStatus[normaliseMac(mac)] = s;
       }
 
-      // VC-level status (used only when module_stat is completely absent)
+      // VC-level status (used as fallback)
       const vcStatus = statsData.status === 'connected' || statsData.up === true ? 'connected'
                      : statsData.status === 'disconnected' || statsData.up === false ? 'disconnected'
-                     : null;
+                     : 'connected';  // VC is reachable since the API call succeeded
 
-      // Apply to members.
-      // If module_stat has entries: members present = connected/per-status,
-      // members ABSENT from module_stat = disconnected (Mist omits offline members).
-      // If module_stat is completely empty: fall back to VC-level status for all members.
-      const hasModuleStat = moduleStat.length > 0;
+      // Check if any MAC from module_stat actually matched our member MACs
+      const anyMatch = vc.members.some((member) => liveStatus[normaliseMac(member.mac)] !== undefined);
 
       for (const member of vc.members) {
         const live = liveStatus[normaliseMac(member.mac)];
         if (live) {
+          // Direct MAC match from module_stat
           member.status = live;
-        } else if (hasModuleStat) {
-          // Member not in module_stat → it's offline
+        } else if (anyMatch) {
+          // Some members matched but this one didn't → it's offline
           member.status = 'disconnected';
         } else {
-          // No module_stat at all → use VC-level status as best guess
-          member.status = vcStatus || 'unknown';
+          // No MAC matches at all (different field name) → use VC-level status for all
+          member.status = vcStatus;
         }
       }
+
+      // Log for debugging
+      console.log(`[Mist] anyMatch=${anyMatch}, memberStatuses:`, vc.members.map(m => `${m.mac}=${m.status}`));
     } catch (e) {
       console.warn(`[Mist] stats/devices failed for VC ${vc.vc_mac}: ${e.message}`);
     }
