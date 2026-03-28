@@ -15,6 +15,11 @@ const VC_BACK_ITEMS = [
   'For VC features',
 ];
 
+const SWITCH_TEMPLATE_BACK_ITEMS = [
+  'Org-level templates',
+  'For all Juniper switches',
+];
+
 function FlipCard({ title, backHeader, backItems, onClick }) {
   const [flipped, setFlipped] = useState(false);
 
@@ -302,7 +307,7 @@ export default function DashboardHome({ onNavigate }) {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <FlipCard
           title="Networks & Port Profiles"
           backHeader="Here you can create Bulk"
@@ -319,8 +324,14 @@ export default function DashboardHome({ onNavigate }) {
           title="Virtual Chassis"
           backHeader="Here you can run VC automation"
           backItems={VC_BACK_ITEMS}
-          onClick={() => onNavigate('virtual-chassis')
-        }/>
+          onClick={() => onNavigate('virtual-chassis')}
+        />
+        <FlipCard
+          title="Org Template"
+          backHeader="Here you can create Switch Templates"
+          backItems={SWITCH_TEMPLATE_BACK_ITEMS}
+          onClick={() => onNavigate('switch-template')}
+        />
       </div>
 
       {/* Runs in Progress */}
