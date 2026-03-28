@@ -476,15 +476,46 @@ async function preprovisionVC(siteId, deviceId, members) {
  * @param {Array}  members  - from listVirtualChassis()
  */
 async function automateVC(siteId, deviceId, members) {
+  await validateToken();
   const steps = [];
 
-  // Step 1: Preprovision
+  // ── Step 1: Fetch current device config (pre-flight) ────────────────────
+  let deviceConfig;
+  try {
+    const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+    console.log(`[Mist] GET ${url} (pre-flight check)`);
+    const res = await fetch(url, { headers: mistHeaders() });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to fetch device config (${res.status}): ${text}`);
+    }
+    deviceConfig = await res.json();
+    steps.push({ step: 'Fetch Device Config', ok: true, message: 'Device config retrieved successfully' });
+  } catch (err) {
+    steps.push({ step: 'Fetch Device Config', ok: false, message: err.message });
+    return steps;
+  }
+
+  // ── Step 2: Check if already preprovisioned ──────────────────────────────
+  const alreadyPreprovisioned =
+    deviceConfig.preprovisioned === true ||
+    (deviceConfig.virtual_chassis && deviceConfig.virtual_chassis.preprovisioned === true);
+
+  if (alreadyPreprovisioned) {
+    steps.push({
+      step: 'Preprovision VC',
+      ok: true,
+      message: 'VC is already preprovisioned — no changes pushed',
+    });
+    return steps;
+  }
+
+  // ── Step 3: Preprovision ─────────────────────────────────────────────────
   try {
     await preprovisionVC(siteId, deviceId, members);
     steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
   } catch (err) {
     steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
-    // Abort remaining steps on critical failure
     return steps;
   }
 
