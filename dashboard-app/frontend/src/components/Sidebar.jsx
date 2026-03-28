@@ -1,5 +1,6 @@
 const NAV_ITEMS = [
-  { label: 'Networks & Port Profiles', icon: '🌐', page: 'dashboard' },
+  { label: 'Dashboard',               icon: '🏠', page: 'home' },
+  { label: 'Networks & Port Profiles', icon: '🌐', page: 'networks' },
   { label: 'Bounce Port',              icon: '🔄', page: 'bounce-port' },
   { label: 'Virtual Chassis',          icon: '🔗', page: 'virtual-chassis' },
 ];
