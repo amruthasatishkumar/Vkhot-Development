@@ -168,20 +168,27 @@ router.post('/vc-automate', async (req, res) => {
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  // Flush headers immediately so the browser fetch() resolves right away
-  // and the reader is set up before any emit() calls happen.
+  // Disable Nagle so each res.write() is sent immediately without TCP batching.
+  // Must be set before flushHeaders so the socket reference is available.
+  res.socket?.setNoDelay(true);
+  // Flush headers immediately — browser fetch() resolves and the reader is
+  // ready before automateVC starts emitting, preventing any missed steps.
   res.flushHeaders();
-  // Disable Nagle's algorithm so each res.write() arrives immediately.
-  if (res.socket) res.socket.setNoDelay(true);
 
-  // Track client disconnect so backend waits can be interrupted immediately
+  // Track whether the RESPONSE has been closed (user navigated away / clicked Stop).
+  // We deliberately do NOT gate emit() on req.on('close') because the Vite dev
+  // proxy closes the request socket right after forwarding headers, which would
+  // set cancelled=true before any step is emitted.
   let cancelled = false;
-  req.on('close', () => { cancelled = true; });
-  const isCancelled = () => cancelled;
+  res.on('close',   () => { cancelled = true; });
+  res.on('finish',  () => { cancelled = true; });
+  const isCancelled = () => cancelled || res.destroyed || res.writableEnded;
 
   const emit = (step) => {
-    if (cancelled) return; // don't write to a closed socket
-    res.write(JSON.stringify(step) + '\n');
+    if (res.writableEnded || res.destroyed) return;
+    try {
+      res.write(JSON.stringify(step) + '\n');
+    } catch { /* response already closed */ }
   };
 
   try {
