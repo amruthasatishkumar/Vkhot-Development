@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const NETWORKS_BACK_ITEMS = [
   'Networks',
@@ -112,7 +112,137 @@ function PlainCard({ title, onClick }) {
   );
 }
 
+// ── SVG Donut Chart ─────────────────────────────────────────────────────────
+function DonutChart({ pct, color, trackColor = '#e5e7eb', size = 110 }) {
+  const r = 42;
+  const circ = 2 * Math.PI * r;
+  const dash = Math.max(0, Math.min(1, pct / 100)) * circ;
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: 'block' }}>
+      <circle cx="50" cy="50" r={r} fill="none" stroke={trackColor} strokeWidth="11" />
+      <circle
+        cx="50" cy="50" r={r} fill="none"
+        stroke={color}
+        strokeWidth="11"
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${circ}`}
+        transform="rotate(-90 50 50)"
+        style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(0.4,0,0.2,1)' }}
+      />
+      <text x="50" y="46" textAnchor="middle" fontSize="19" fontWeight="800" fill={color}>
+        {pct}%
+      </text>
+      <text x="50" y="62" textAnchor="middle" fontSize="9" fontWeight="500" fill="#9ca3af">
+        complete
+      </text>
+    </svg>
+  );
+}
+
+// ── Polling hook: reads live progress from storage every second ───────────────
+function useRunsInProgress() {
+  const [runs, setRuns] = useState([]);
+  useEffect(() => {
+    function read() {
+      const result = [];
+
+      // Bounce Port — localStorage
+      try {
+        const saved = JSON.parse(localStorage.getItem('bounce_session'));
+        if (saved && saved.endTime > Date.now()) {
+          const totalSecs = saved.durationMins * 60;
+          const remaining = Math.max(0, (saved.endTime - Date.now()) / 1000);
+          const pct       = Math.min(99, Math.round(((totalSecs - remaining) / totalSecs) * 100));
+          const remMins   = Math.floor(remaining / 60);
+          const remSecs   = Math.round(remaining % 60);
+          result.push({
+            key:    'bounce',
+            label:  'Bounce Port',
+            sub:    saved.switchInfo?.name || 'Running',
+            pct,
+            detail: `${remMins}m ${String(remSecs).padStart(2, '0')}s remaining`,
+            color:  '#10b981',
+            track:  '#d1fae5',
+          });
+        }
+      } catch { /* ignore */ }
+
+      // VC Automation — sessionStorage
+      try {
+        const ran       = sessionStorage.getItem('vc:ran')       === 'true';
+        const completed = sessionStorage.getItem('vc:completed') === 'true';
+        if (ran && !completed) {
+          const steps      = JSON.parse(sessionStorage.getItem('vc:steps')) || [];
+          const done       = steps.filter((s) => s.ok !== null).length;
+          const total      = Math.max(steps.length, 6);
+          const pct        = total === 0 ? 0 : Math.round((done / total) * 100);
+          const activeStep = steps.find((s) => s.ok === null);
+          result.push({
+            key:    'vc',
+            label:  'Virtual Chassis',
+            sub:    activeStep ? activeStep.step : `${done}/${total} steps done`,
+            pct,
+            detail: `${done} of ${total} steps complete`,
+            color:  '#6366f1',
+            track:  '#e0e7ff',
+          });
+        }
+      } catch { /* ignore */ }
+
+      setRuns(result);
+    }
+
+    read();
+    const id = setInterval(read, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return runs;
+}
+
+// ── Runs In Progress section ─────────────────────────────────────────────────
+function RunsInProgress({ runs, onNavigate }) {
+  if (runs.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+        </span>
+        <p className="text-sm font-bold text-gray-700 dark:text-gray-200 tracking-tight">Runs in Progress</p>
+        <span className="ml-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-semibold">
+          {runs.length} active
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {runs.map((run) => (
+          <button
+            key={run.key}
+            type="button"
+            onClick={() => onNavigate(run.key === 'bounce' ? 'bounce-port' : 'virtual-chassis')}
+            className="group w-full text-left bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-600 transition-all duration-200 p-5 flex items-center gap-5"
+          >
+            <div className="flex-shrink-0">
+              <DonutChart pct={run.pct} color={run.color} trackColor={run.track} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">{run.label}</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5 truncate">{run.sub}</p>
+              <div className="mt-3 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: run.color }} />
+                <p className="text-xs font-semibold" style={{ color: run.color }}>{run.detail}</p>
+              </div>
+              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 group-hover:text-indigo-500 transition-colors">Click to view →</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardHome({ onNavigate }) {
+  const runs = useRunsInProgress();
   return (
     <div className="space-y-8 max-w-3xl">
 
@@ -147,6 +277,9 @@ export default function DashboardHome({ onNavigate }) {
           onClick={() => onNavigate('virtual-chassis')}
         />
       </div>
+
+      {/* Runs in Progress */}
+      <RunsInProgress runs={runs} onNavigate={onNavigate} />
 
     </div>
   );
