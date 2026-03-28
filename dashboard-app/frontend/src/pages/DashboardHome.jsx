@@ -251,24 +251,27 @@ function useInventoryStats() {
 const INV_CARDS = [
   {
     key: 'standalone', label: 'Standalone Switches', icon: '🔌',
-    bg:      'linear-gradient(135deg, #1a1f2e 0%, #1e2540 100%)',
-    numColor: '#60a5fa',
-    iconBg:   'rgba(96,165,250,0.12)',
-    border:   '1px solid rgba(96,165,250,0.2)',
+    bg:        'linear-gradient(135deg, #1a1f2e 0%, #1e2540 100%)',
+    numColor:  '#60a5fa',
+    labelColor:'#60a5fa',
+    iconBg:    'rgba(96,165,250,0.12)',
+    border:    '1px solid rgba(96,165,250,0.2)',
   },
   {
     key: 'vc', label: 'VC Switches', icon: '🔗',
-    bg:      'linear-gradient(135deg, #151b3a 0%, #1e2a5e 100%)',
-    numColor: '#818cf8',
-    iconBg:   'rgba(129,140,248,0.12)',
-    border:   '1px solid rgba(129,140,248,0.25)',
+    bg:        'linear-gradient(135deg, #151b3a 0%, #1e2a5e 100%)',
+    numColor:  '#818cf8',
+    labelColor:'#818cf8',
+    iconBg:    'rgba(129,140,248,0.12)',
+    border:    '1px solid rgba(129,140,248,0.25)',
   },
   {
     key: 'ap', label: 'Access Points', icon: '📡',
-    bg:      'linear-gradient(135deg, #1a1a2e 0%, #2a1f3d 100%)',
-    numColor: '#f472b6',
-    iconBg:   'rgba(244,114,182,0.12)',
-    border:   '1px solid rgba(244,114,182,0.2)',
+    bg:        'linear-gradient(135deg, #1a1a2e 0%, #2a1f3d 100%)',
+    numColor:  '#f472b6',
+    labelColor:'#f472b6',
+    iconBg:    'rgba(244,114,182,0.12)',
+    border:    '1px solid rgba(244,114,182,0.2)',
   },
 ];
 
@@ -302,7 +305,7 @@ function InventoryPanel() {
       )}
 
       {/* Cards */}
-      {INV_CARDS.map(({ key, label, icon, bg, numColor, iconBg, border }) => {
+      {INV_CARDS.map(({ key, label, icon, bg, numColor, labelColor, iconBg, border }) => {
         const d            = data?.[key];
         const total        = loading && !d ? null : (d?.total        ?? 0);
         const connected    = loading && !d ? null : (d?.connected    ?? 0);
@@ -314,8 +317,8 @@ function InventoryPanel() {
 
             {/* Top row: label + icon badge */}
             <div className="flex items-start justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-widest leading-tight"
-                style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest leading-tight"
+                style={{ color: labelColor }}>
                 {label}
               </p>
               <span className="text-base leading-none rounded-lg p-1.5 flex-shrink-0"
@@ -336,7 +339,7 @@ function InventoryPanel() {
                 style={{ color: '#4ade80' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
                 {connected === null ? '…' : connected}
-                <span className="font-normal" style={{ color: 'rgba(74,222,128,0.55)' }}> on</span>
+                <span className="font-normal" style={{ color: 'rgba(74,222,128,0.55)' }}> connected</span>
               </span>
               <span className="w-px h-3 bg-white/10 inline-block" />
               <span className="flex items-center gap-1 text-xs font-semibold"
@@ -344,7 +347,7 @@ function InventoryPanel() {
                 <span className="w-1.5 h-1.5 rounded-full inline-block"
                   style={{ background: hasDisc ? '#f87171' : 'rgba(255,255,255,0.2)' }} />
                 {disconnected === null ? '…' : disconnected}
-                <span className="font-normal" style={{ opacity: 0.55 }}> off</span>
+                <span className="font-normal" style={{ opacity: 0.55 }}> disconnected</span>
               </span>
             </div>
           </div>
