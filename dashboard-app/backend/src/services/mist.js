@@ -407,7 +407,7 @@ async function listVirtualChassis() {
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, automateVC };
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC, renumberVC, automateVC };
 
 // Inventory vc_role → Mist API vc_role mapping
 const VC_ROLE_MAP = {
@@ -468,6 +468,67 @@ async function preprovisionVC(siteId, deviceId, members) {
 }
 
 /**
+ * Renumber a Virtual Chassis: swap fpc0 (member_id 0) ↔ fpc1 (member_id 1).
+ * Same PUT endpoint + payload shape as preprovision — only member_id 0 and 1 exchange.
+ * Linecards (member_id >= 2) are untouched.
+ *
+ * @param {string} siteId
+ * @param {string} deviceId
+ */
+async function renumberVC(siteId, deviceId) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
+
+  // Re-fetch to get the latest member_id state (may have just been preprovisioned)
+  console.log(`[Mist] GET ${url} (renumber pre-fetch)`);
+  const getRes = await fetch(url, { headers: mistHeaders() });
+  if (!getRes.ok) {
+    const text = await getRes.text();
+    throw new Error(`Failed to fetch device config for renumber (${getRes.status}): ${text}`);
+  }
+  const config = await getRes.json();
+
+  const currentMembers = config.virtual_chassis && config.virtual_chassis.members;
+  if (!currentMembers || currentMembers.length < 2) {
+    throw new Error('Cannot renumber: virtual_chassis.members not found or fewer than 2 members');
+  }
+
+  const hasFpc0 = currentMembers.some((m) => m.member_id === 0);
+  const hasFpc1 = currentMembers.some((m) => m.member_id === 1);
+  if (!hasFpc0 || !hasFpc1) {
+    throw new Error('Cannot renumber: member_id 0 or 1 not found in virtual_chassis.members');
+  }
+
+  // Swap member_ids 0 ↔ 1; everything else (mac, vc_role, higher member_ids) stays the same
+  const swappedMembers = currentMembers.map((m) => ({
+    mac:       normaliseMac(m.mac),
+    vc_role:   m.vc_role,
+    member_id: m.member_id === 0 ? 1 : m.member_id === 1 ? 0 : m.member_id,
+  }));
+
+  const body = {
+    virtual_chassis: { preprovisioned: true, members: swappedMembers },
+    preprovisioned:  true,
+  };
+
+  console.log(`[Mist] PUT ${url} (renumber fpc0↔fpc1)`, JSON.stringify(body));
+  const putRes = await fetch(url, {
+    method:  'PUT',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!putRes.ok) {
+    const text = await putRes.text();
+    throw new Error(`Mist renumber failed (${putRes.status}): ${text}`);
+  }
+
+  const text = await putRes.text();
+  return text ? JSON.parse(text) : { ok: true };
+}
+
+/**
  * Orchestrate all VC automation steps sequentially.
  * Returns an array of step results: [{ step, ok, message }]
  *
@@ -496,30 +557,37 @@ async function automateVC(siteId, deviceId, members) {
     return steps;
   }
 
-  // ── Step 2: Check if already preprovisioned ──────────────────────────────
+  // ── Step 2: Preprovision VC (skip if already done) ────────────────────
   const alreadyPreprovisioned =
     deviceConfig.preprovisioned === true ||
     (deviceConfig.virtual_chassis && deviceConfig.virtual_chassis.preprovisioned === true);
 
   if (alreadyPreprovisioned) {
-    steps.push({
-      step: 'Preprovision VC',
-      ok: true,
-      message: 'VC is already preprovisioned — no changes pushed',
-    });
-    return steps;
+    steps.push({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned — no changes pushed' });
+  } else {
+    try {
+      await preprovisionVC(siteId, deviceId, members);
+      steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
+    } catch (err) {
+      steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
+      return steps; // Cannot safely renumber if preprovision failed
+    }
   }
 
-  // ── Step 3: Preprovision ─────────────────────────────────────────────────
+  // ── Step 3: Renumber VC (swap fpc0 ↔ fpc1) ──────────────────────────────
   try {
-    await preprovisionVC(siteId, deviceId, members);
-    steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
+    await renumberVC(siteId, deviceId);
+    steps.push({
+      step:    'Renumber VC (fpc0 ↔ fpc1)',
+      ok:      true,
+      message: 'fpc0 and fpc1 member IDs swapped successfully. Note: port profile assignments are not auto-updated after renumbering — verify them in Mist.',
+    });
   } catch (err) {
-    steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
+    steps.push({ step: 'Renumber VC (fpc0 ↔ fpc1)', ok: false, message: err.message });
     return steps;
   }
 
-  // Future steps go here (e.g. verify membership, configure uplinks)
+  // Future steps go here
 
   return steps;
 }
