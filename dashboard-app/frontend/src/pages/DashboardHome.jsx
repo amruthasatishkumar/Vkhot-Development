@@ -343,9 +343,9 @@ function InventoryPanel() {
               </span>
               <span className="w-px h-3 bg-white/10 inline-block" />
               <span className="flex items-center gap-1 text-xs font-semibold"
-                style={{ color: hasDisc ? '#f87171' : 'rgba(255,255,255,0.2)' }}>
+                style={{ color: hasDisc ? '#f87171' : 'rgba(255,255,255,0.55)' }}>
                 <span className="w-1.5 h-1.5 rounded-full inline-block"
-                  style={{ background: hasDisc ? '#f87171' : 'rgba(255,255,255,0.2)' }} />
+                  style={{ background: hasDisc ? '#f87171' : 'rgba(255,255,255,0.45)' }} />
                 {disconnected === null ? '…' : disconnected}
                 <span className="font-normal" style={{ opacity: 0.55 }}> disconnected</span>
               </span>
