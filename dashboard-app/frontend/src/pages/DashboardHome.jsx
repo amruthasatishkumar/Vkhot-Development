@@ -22,7 +22,16 @@ function FlipCard({ title, backItems, onClick }) {
 
   return (
     <div
-      style={{ perspective: '1000px', height: '160px' }}
+      style={{
+        perspective: '1000px',
+        height: '160px',
+        // Spring easing (0.34, 1.56, 0.64, 1) overshoots slightly → natural bounce
+        transform: flipped ? 'translateY(-10px) scale(1.05)' : 'translateY(0px) scale(1)',
+        transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        filter: flipped
+          ? 'drop-shadow(0 24px 48px rgba(0,0,0,0.22))'
+          : 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))',
+      }}
       onMouseEnter={() => setFlipped(true)}
       onMouseLeave={() => setFlipped(false)}
     >
@@ -30,10 +39,7 @@ function FlipCard({ title, backItems, onClick }) {
         position: 'relative', width: '100%', height: '100%',
         transformStyle: 'preserve-3d',
         transition: 'transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1)',
-        transform: flipped ? 'rotateY(180deg) translateY(-6px)' : 'rotateY(0deg)',
-        filter: flipped
-          ? 'drop-shadow(0 20px 40px rgba(0,0,0,0.18))'
-          : 'drop-shadow(0 2px 6px rgba(0,0,0,0.08))',
+        transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
       }}>
 
         {/* Front */}
