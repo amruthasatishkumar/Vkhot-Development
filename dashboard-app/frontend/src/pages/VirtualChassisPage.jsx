@@ -67,9 +67,29 @@ function StepRow({ step }) {
 
 // ── VC Automation Page (detail + runner) ──────────────────────────────────────
 function VCAutomationView({ vc, onBack }) {
-  const [automating, setAutomating] = useState(false);
-  const [steps,      setSteps]      = useState([]);
-  const [ran,        setRan]        = useState(false);
+  const [automating,  setAutomating]  = useState(false);
+  const [steps,       setSteps]       = useState([]);
+  const [ran,         setRan]         = useState(false);
+  const [members,     setMembers]     = useState(vc.members);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [refreshErr,  setRefreshErr]  = useState('');
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setRefreshErr('');
+    try {
+      const res  = await fetch('/api/networks/virtual-chassis');
+      const data = await res.json();
+      if (!res.ok) { setRefreshErr(data.error || 'Refresh failed.'); return; }
+      const updated = (data.virtualChassis || []).find((v) => v.vc_mac === vc.vc_mac);
+      if (updated) setMembers(updated.members);
+      else setRefreshErr('VC not found in latest inventory.');
+    } catch {
+      setRefreshErr('Could not reach backend.');
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function handleStart() {
     setAutomating(true);
@@ -154,7 +174,7 @@ function VCAutomationView({ vc, onBack }) {
           </div>
           <div>
             <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Members</p>
-            <p className="font-semibold text-gray-800 dark:text-gray-100">{vc.members.length}</p>
+            <p className="font-semibold text-gray-800 dark:text-gray-100">{members.length}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-0.5">Site ID</p>
@@ -165,10 +185,22 @@ function VCAutomationView({ vc, onBack }) {
 
       {/* Members table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Members</p>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Refresh the VC to see updated stats"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50">
+            <span className={refreshing ? 'animate-spin inline-block' : 'inline-block'}>↻</span>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
         </div>
-        <MemberTable members={vc.members} />
+        {refreshErr && (
+          <p className="px-5 py-2 text-xs text-red-500 dark:text-red-400 border-b border-gray-100 dark:border-gray-700">{refreshErr}</p>
+        )}
+        <MemberTable members={members} />
       </div>
 
       {/* Automation launcher */}
@@ -208,16 +240,14 @@ function VCAutomationView({ vc, onBack }) {
 
 // ── VC List View ──────────────────────────────────────────────────────────────
 function VCListView({ onStart }) {
-  const [loading,    setLoading]    = useState(false);
-  const [apiError,   setApiError]   = useState('');
-  const [vcs,        setVcs]        = useState(null);
-  const [selectedVc, setSelectedVc] = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [vcs,      setVcs]      = useState(null);
 
   async function loadVCs() {
     setLoading(true);
     setApiError('');
     setVcs(null);
-    setSelectedVc(null);
     try {
       const res  = await fetch('/api/networks/virtual-chassis');
       const data = await res.json();
@@ -228,10 +258,6 @@ function VCListView({ onStart }) {
     } finally {
       setLoading(false);
     }
-  }
-
-  function selectVc(vc) {
-    setSelectedVc((prev) => prev?.vc_mac === vc.vc_mac ? null : vc);
   }
 
   return (
@@ -247,7 +273,7 @@ function VCListView({ onStart }) {
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Discover Virtual Chassis</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Scan your org inventory, then click a VC card to select it.
+          Scan your org inventory, then click a VC card to start VC automation.
         </p>
         <button type="button" onClick={loadVCs} disabled={loading}
           className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -270,56 +296,30 @@ function VCListView({ onStart }) {
       {vcs !== null && vcs.length > 0 && (
         <div className="space-y-4">
           <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-            {vcs.length} Virtual Chassis found — click a card to select
+            {vcs.length} Virtual Chassis found — click a card to start VC automation
           </p>
 
-          {/* Start button — appears when a VC is selected */}
-          {selectedVc && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-brand-500 shadow-sm p-5 flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                  Selected: <span className="text-brand-600 dark:text-brand-400">{selectedVc.name}</span>
-                </p>
-                <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">{selectedVc.vc_mac}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onStart(selectedVc)}
-                className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors">
-                🚀 Start VC Automation
-              </button>
-            </div>
-          )}
-
           {/* VC cards */}
-          {vcs.map((vc) => {
-            const isSelected = selectedVc?.vc_mac === vc.vc_mac;
-            return (
-              <div
-                key={vc.vc_mac}
-                onClick={() => selectVc(vc)}
-                className={`bg-white dark:bg-gray-800 rounded-2xl border shadow-sm overflow-hidden cursor-pointer transition-all
-                  ${isSelected
-                    ? 'border-brand-500 dark:border-brand-400 ring-2 ring-brand-500/20'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 hover:shadow-md'}`}>
-                <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                  <div>
-                    <p className="text-base font-semibold text-gray-800 dark:text-gray-100">{vc.name}</p>
-                    <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">MAC: {vc.vc_mac}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
-                      {vc.members.length} member{vc.members.length !== 1 ? 's' : ''}
-                    </span>
-                    {isSelected
-                      ? <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">Selected ✓</span>
-                      : <span className="text-xs text-gray-400 dark:text-gray-500">Click to select</span>}
-                  </div>
+          {vcs.map((vc) => (
+            <div
+              key={vc.vc_mac}
+              onClick={() => onStart(vc)}
+              className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden cursor-pointer transition-all hover:border-brand-300 dark:hover:border-brand-600 hover:shadow-md">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <p className="text-base font-semibold text-gray-800 dark:text-gray-100">{vc.name}</p>
+                  <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">MAC: {vc.vc_mac}</p>
                 </div>
-                <MemberTable members={vc.members} />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
+                    {vc.members.length} member{vc.members.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Click to automate →</span>
+                </div>
               </div>
-            );
-          })}
+              <MemberTable members={vc.members} />
+            </div>
+          ))}
         </div>
       )}
     </div>
