@@ -397,23 +397,59 @@ async function listVirtualChassis() {
   }));
 
   return [...vcMap.values()].map((vc) => ({
-    vc_mac:  vc.vc_mac,
-    name:    vc.name,
-    site_id: vc.site_id,
-    members: vc.members.sort(
+    vc_mac:    vc.vc_mac,
+    device_id: vc.device_id,   // virtual chassis logical device ID (mac === vc_mac)
+    name:      vc.name,
+    site_id:   vc.site_id,
+    members:   vc.members.sort(
       (a, b) => (roleOrder[a.vc_role] ?? 3) - (roleOrder[b.vc_role] ?? 3)
-    ).map(({ id: _id, ...rest }) => rest),   // strip internal id
+    ),
   }));
 }
 
-module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis };
-
-const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
+module.exports = { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC };
 
 /**
- * Create N port profiles on a switch using existing VLAN_XXX networks.
- * Each profile randomly picks 2 distinct VLANs — one for port_network, one for voip_network.
+ * Preprovision a Virtual Chassis.
+ * Calls POST /api/v1/sites/{site_id}/devices/{device_id}/vc
+ * with op=preprovision and per-member role + vc_ports.
+ *
+ * @param {string} siteId
+ * @param {string} deviceId  - the VC logical device ID (mac === vc_mac)
+ * @param {Array}  members   - [{ mac, vc_role, vc_ports: string[] }]
  */
+async function preprovisionVC(siteId, deviceId, members) {
+  await validateToken();
+
+  const url = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}/vc`;
+  console.log(`[Mist] POST ${url}`);
+
+  const body = {
+    op: 'preprovision',
+    members: members.map((m) => ({
+      mac:      normaliseMac(m.mac),
+      vc_role:  m.vc_role,
+      vc_ports: Array.isArray(m.vc_ports) ? m.vc_ports : [],
+    })),
+  };
+
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { ...mistHeaders(), 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mist preprovision failed (${res.status}): ${text}`);
+  }
+
+  // 200/204 — success (Mist may return empty body)
+  const text = await res.text();
+  return text ? JSON.parse(text) : { ok: true };
+}
+
+const APP_PROFILE_PATTERN = /^PROFILE_\d+$/;
 async function createPortProfilesOnDevice(siteId, deviceId, count, mode) {
   const getUrl = `${BASE_URL}/api/v1/sites/${siteId}/devices/${deviceId}`;
   console.log(`[Mist] GET ${getUrl}`);

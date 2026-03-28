@@ -1,5 +1,5 @@
 const express = require('express');
-const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis } = require('../services/mist');
+const { findSwitchByMac, generateVlans, createNetworksOnDevice, removeAppVlansFromDevice, createPortProfilesOnDevice, removeAppPortProfilesFromDevice, assignPortProfilesToDownPorts, removeAppPortAssignmentsFromDevice, getDownPortsForBounce, bouncePortsOnce, listVirtualChassis, preprovisionVC } = require('../services/mist');
 
 const router = express.Router();
 
@@ -150,6 +150,38 @@ router.get('/virtual-chassis', async (_req, res) => {
   try {
     const vcs = await listVirtualChassis();
     res.json({ count: vcs.length, virtualChassis: vcs });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// POST /api/networks/vc-preprovision
+// Body: { site_id, device_id, members: [{ mac, vc_role, vc_ports: ["et-0/0/48","et-0/0/49"] }] }
+router.post('/vc-preprovision', async (req, res) => {
+  const { site_id, device_id, members } = req.body;
+
+  if (!site_id || typeof site_id !== 'string' || !site_id.trim()) {
+    return res.status(400).json({ error: 'site_id is required.' });
+  }
+  if (!device_id || typeof device_id !== 'string' || !device_id.trim()) {
+    return res.status(400).json({ error: 'device_id is required.' });
+  }
+  if (!Array.isArray(members) || members.length === 0) {
+    return res.status(400).json({ error: 'members array is required and must not be empty.' });
+  }
+  const validRoles = ['master', 'backup', 'linecard'];
+  for (const m of members) {
+    if (!m.mac || !MAC_REGEX.test(m.mac.trim())) {
+      return res.status(400).json({ error: `Invalid MAC address: ${m.mac}` });
+    }
+    if (!validRoles.includes(m.vc_role)) {
+      return res.status(400).json({ error: `Invalid vc_role "${m.vc_role}". Must be master, backup, or linecard.` });
+    }
+  }
+
+  try {
+    const result = await preprovisionVC(site_id.trim(), device_id.trim(), members);
+    res.json({ ok: true, result });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
