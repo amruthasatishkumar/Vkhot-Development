@@ -563,18 +563,28 @@ async function automateVC(siteId, deviceId, members) {
     return steps;
   }
 
-  // ── Step 2: Preprovision VC (skip if already done) ────────────────────
+  // ── Step 2: Preprovision VC ───────────────────────────────────────────
   const alreadyPreprovisioned =
     deviceConfig.preprovisioned === true ||
     (deviceConfig.virtual_chassis && deviceConfig.virtual_chassis.preprovisioned === true);
 
+  // Even if already preprovisioned, check whether the existing config has
+  // incorrect roles (all linecards, no routing-engine). If so, re-push.
+  const existingMembers = deviceConfig.virtual_chassis && deviceConfig.virtual_chassis.members;
+  const hasRoutingEngine = existingMembers &&
+    existingMembers.some((m) => m.vc_role === 'routing-engine');
+  const rolesAreWrong = alreadyPreprovisioned && existingMembers && !hasRoutingEngine;
+
   let justProvisioned = false;
-  if (alreadyPreprovisioned) {
-    steps.push({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned — no changes pushed' });
+  if (alreadyPreprovisioned && !rolesAreWrong) {
+    steps.push({ step: 'Preprovision VC', ok: true, message: 'VC is already preprovisioned with correct roles — no changes pushed' });
   } else {
+    const reason = rolesAreWrong
+      ? 'VC is preprovisioned but has no routing-engine roles — re-pushing with correct roles'
+      : 'VC is not preprovisioned — pushing config';
     try {
       await preprovisionVC(siteId, deviceId, members);
-      steps.push({ step: 'Preprovision VC', ok: true, message: 'Pushed successfully to Mist' });
+      steps.push({ step: 'Preprovision VC', ok: true, message: `${reason}. Pushed successfully to Mist` });
       justProvisioned = true;
     } catch (err) {
       steps.push({ step: 'Preprovision VC', ok: false, message: err.message });
