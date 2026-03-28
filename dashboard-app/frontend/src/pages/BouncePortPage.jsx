@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-const MAC_REGEX   = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
-const STORAGE_KEY = 'bounce_session';
+const MAC_REGEX = /^([0-9a-fA-F]{2}[:\-]?){5}[0-9a-fA-F]{2}$/;
 
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60);
@@ -13,11 +12,12 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour12: false });
 }
 
-function saveSession(data)  { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* ignore */ } }
-function loadSession()      { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; } }
-function clearSession()     { localStorage.removeItem(STORAGE_KEY); }
+function saveSession(key, data)  { try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* ignore */ } }
+function loadSession(key)        { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+function clearSession(key)       { localStorage.removeItem(key); }
 
-export default function BouncePortPage({ onBounceStatusChange }) {
+// ── Per-switch bounce tab ─────────────────────────────────────────────────────
+function BouncePortTab({ storageKey, onStatusChange }) {
   // Discovery
   const [mac,          setMac]          = useState('');
   const [macError,     setMacError]     = useState('');
@@ -39,7 +39,7 @@ export default function BouncePortPage({ onBounceStatusChange }) {
   const [bounceErr,    setBounceErr]    = useState('');
   const [wasRestored,  setWasRestored]  = useState(false);
 
-  // Stable refs — safe to read inside setInterval callbacks
+  // Stable refs
   const bounceIntervalRef = useRef(null);
   const countdownTimerRef = useRef(null);
   const endTimeRef        = useRef(null);
@@ -49,9 +49,9 @@ export default function BouncePortPage({ onBounceStatusChange }) {
   const logRef            = useRef([]);
   const restoredRef       = useRef(false);
 
-  // Notify parent (App.jsx) — drives the sidebar live dot
+  // Notify parent — drives sidebar dot + per-tab indicator
   useEffect(() => {
-    onBounceStatusChange?.(status === 'running');
+    onStatusChange?.(status === 'running');
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup on unmount
@@ -64,10 +64,10 @@ export default function BouncePortPage({ onBounceStatusChange }) {
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    const saved = loadSession();
+    const saved = loadSession(storageKey);
     if (!saved) return;
     const remainingSecs = Math.round((saved.endTime - Date.now()) / 1000);
-    if (remainingSecs <= 5) { clearSession(); return; }
+    if (remainingSecs <= 5) { clearSession(storageKey); return; }
 
     setSwitchInfo(saved.switchInfo);
     setPorts(saved.ports);
@@ -90,7 +90,7 @@ export default function BouncePortPage({ onBounceStatusChange }) {
 
   // ── Bounce core ─────────────────────────────────────────────────────────────
 
-  async function doBouce() {
+  async function doBounce() {
     const sw      = switchRef.current;
     const portIds = portsRef.current.map((p) => p.port_id);
     if (!sw || portIds.length === 0) return;
@@ -115,8 +115,8 @@ export default function BouncePortPage({ onBounceStatusChange }) {
         setBounceCount(bounceCountRef.current);
         setLog([...logRef.current]);
         setBounceErr('');
-        const saved = loadSession();
-        if (saved) saveSession({ ...saved, bounceCount: bounceCountRef.current, log: logRef.current });
+        const saved = loadSession(storageKey);
+        if (saved) saveSession(storageKey, { ...saved, bounceCount: bounceCountRef.current, log: logRef.current });
       }
     } catch {
       const entry = { ts: new Date().toISOString(), bounced: 0, error: 'Could not reach the backend.' };
@@ -126,10 +126,10 @@ export default function BouncePortPage({ onBounceStatusChange }) {
   }
 
   function startIntervals(intSecs, skipFirstBounce = false) {
-    if (!skipFirstBounce) doBouce();
+    if (!skipFirstBounce) doBounce();
     bounceIntervalRef.current = setInterval(async () => {
       if (Date.now() >= endTimeRef.current) { stopAll(); return; }
-      await doBouce();
+      await doBounce();
     }, intSecs * 1000);
     countdownTimerRef.current = setInterval(() => {
       const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
@@ -143,7 +143,7 @@ export default function BouncePortPage({ onBounceStatusChange }) {
     clearInterval(countdownTimerRef.current);
     bounceIntervalRef.current = null;
     countdownTimerRef.current = null;
-    clearSession();
+    clearSession(storageKey);
     setStatus('stopped');
   }
 
@@ -191,13 +191,12 @@ export default function BouncePortPage({ onBounceStatusChange }) {
     setCountdown(durMins * 60); setBounceCount(0); setLastBounce(null);
     setLog([]); setBounceErr(''); setWasRestored(false); setStatus('running');
 
-    saveSession({ endTime: newEndTime, durationMins: durMins, intervalSecs: intSecs, switchInfo, ports, bounceCount: 0, log: [] });
+    saveSession(storageKey, { endTime: newEndTime, durationMins: durMins, intervalSecs: intSecs, switchInfo, ports, bounceCount: 0, log: [] });
     startIntervals(intSecs, false);
   }
 
   function handleStop() { stopAll(); }
 
-  // Keep ports, let user tweak config and start again without re-discovering
   function handleStartAgain() {
     setBounceCount(0); setLastBounce(null); setLog([]); setBounceErr('');
     bounceCountRef.current = 0; logRef.current = [];
@@ -222,13 +221,7 @@ export default function BouncePortPage({ onBounceStatusChange }) {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 max-w-3xl">
-
-      {/* Welcome banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
-        <p className="text-lg font-bold text-white tracking-tight">🔄 Bounce Port</p>
-        <p className="text-sm text-indigo-100 mt-0.5">Continuously bounce down ports on a staging switch for testing.</p>
-      </div>
+    <div className="space-y-5">
 
       {/* Session-restored notice */}
       {wasRestored && (
@@ -378,44 +371,105 @@ export default function BouncePortPage({ onBounceStatusChange }) {
                 ${status === 'running' ? 'text-green-700 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
                 {formatCountdown(countdown)}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">remaining</p>
             </div>
             <div className="text-right">
-              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Total Bounces</p>
-              <p className="text-4xl font-mono font-bold text-gray-800 dark:text-gray-100">{bounceCount}</p>
-              {lastBounce && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Last: {fmtTime(lastBounce)}</p>}
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Bounces</p>
+              <p className="text-4xl font-mono font-bold text-brand-600 dark:text-brand-400">{bounceCount}</p>
             </div>
           </div>
+
+          {lastBounce && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">Last bounce: {fmtTime(lastBounce)}</p>
+          )}
           {bounceErr && (
-            <div className="rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 px-4 py-2 text-xs text-red-700 dark:text-red-400">
-              <strong>Bounce error:</strong> {bounceErr}
-            </div>
+            <p className="text-xs text-red-500 dark:text-red-400">⚠ {bounceErr}</p>
           )}
         </div>
       )}
 
-      {/* Activity log */}
+      {/* Bounce log */}
       {log.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Activity Log (newest first)</p>
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Bounce Log</p>
           </div>
-          <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-72 overflow-y-auto">
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700 max-h-56 overflow-y-auto">
             {log.map((entry, i) => (
-              <li key={i} className="flex items-center justify-between px-5 py-2.5">
-                <span className="font-mono text-gray-400 dark:text-gray-500 text-xs w-20 shrink-0">{fmtTime(entry.ts)}</span>
-                {entry.error ? (
-                  <span className="text-red-500 dark:text-red-400 text-xs text-right">✗ {entry.error}</span>
-                ) : (
-                  <span className="text-green-600 dark:text-green-400 text-xs font-medium">
-                    ✓ Bounced {entry.bounced} port{entry.bounced !== 1 ? 's' : ''}
-                  </span>
-                )}
+              <li key={i} className="px-5 py-2.5 text-sm flex items-center justify-between gap-4">
+                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">{fmtTime(entry.ts)}</span>
+                {entry.error
+                  ? <span className="text-red-500 text-xs">{entry.error}</span>
+                  : <span className="text-gray-700 dark:text-gray-200">{entry.bounced} port{entry.bounced !== 1 ? 's' : ''} bounced</span>}
               </li>
             ))}
           </ul>
         </div>
       )}
+
+    </div>
+  );
+}
+
+// ── Root page — 3 independent switch tabs ─────────────────────────────────────
+const TAB_LABELS = ['Switch 1', 'Switch 2', 'Switch 3'];
+const TAB_KEYS   = ['bounce_session_1', 'bounce_session_2', 'bounce_session_3'];
+
+export default function BouncePortPage({ onBounceStatusChange }) {
+  const [activeTab,    setActiveTab]    = useState(0);
+  const [tabsRunning,  setTabsRunning]  = useState([false, false, false]);
+
+  // Notify sidebar if ANY tab is running
+  useEffect(() => {
+    onBounceStatusChange?.(tabsRunning.some(Boolean));
+  }, [tabsRunning]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleTabStatus(idx, running) {
+    setTabsRunning((prev) => {
+      const next = [...prev];
+      next[idx] = running;
+      return next;
+    });
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+
+      {/* Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-500 px-6 py-4 shadow-md">
+        <p className="text-lg font-bold text-white tracking-tight">🔄 Bounce Port</p>
+        <p className="text-sm text-indigo-100 mt-0.5">Continuously bounce down ports on up to 3 switches simultaneously.</p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          {TAB_LABELS.map((label, i) => (
+            <button key={i} type="button"
+              onClick={() => setActiveTab(i)}
+              className={`relative flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === i
+                  ? 'border-brand-500 text-brand-600 dark:text-brand-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}>
+              {label}
+              {/* green dot when this tab's session is running */}
+              {tabsRunning[i] && (
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Keep all 3 tabs mounted so running intervals survive tab-switches */}
+        {TAB_LABELS.map((_, i) => (
+          <div key={i} className={activeTab === i ? 'p-6' : 'hidden'}>
+            <BouncePortTab
+              storageKey={TAB_KEYS[i]}
+              onStatusChange={(running) => handleTabStatus(i, running)}
+            />
+          </div>
+        ))}
+      </div>
 
     </div>
   );
