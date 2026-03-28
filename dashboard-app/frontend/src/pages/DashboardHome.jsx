@@ -20,19 +20,18 @@ export default function DashboardHome({ onNavigate }) {
 
       {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {CARDS.map(({ page, icon, title }) => (
+        {CARDS.map(({ page, title }) => (
           <button
             key={page}
             type="button"
             onClick={() => onNavigate(page)}
-            className="group w-full text-left bg-white dark:bg-gray-700 rounded-2xl border border-gray-100 dark:border-gray-600 shadow-sm hover:scale-[1.06] hover:shadow-2xl hover:border-brand-300 dark:hover:border-brand-500 active:scale-[0.97] transition-all duration-200 p-6 flex flex-col items-start gap-4"
+            className="group w-full text-left bg-white dark:bg-amber-50 rounded-2xl border border-gray-100 dark:border-amber-100 shadow-sm hover:scale-[1.06] hover:shadow-2xl hover:border-brand-300 dark:hover:border-brand-400 active:scale-[0.97] transition-all duration-200 p-6 flex flex-col items-start gap-4"
           >
-            <span className="text-3xl">{icon}</span>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-brand-600 dark:group-hover:text-brand-300 transition-colors leading-snug">
+            <p className="text-base font-extrabold tracking-tight text-gray-900 group-hover:text-brand-600 dark:text-gray-900 dark:group-hover:text-brand-700 transition-colors leading-snug">
               {title}
             </p>
-            <span className="mt-auto text-xs text-gray-400 dark:text-gray-300 group-hover:text-brand-500 dark:group-hover:text-brand-300 group-hover:translate-x-1 transition-all duration-200">
-              Open →
+            <span className="mt-auto text-xs font-medium text-gray-400 dark:text-gray-500 group-hover:text-brand-500 dark:group-hover:text-brand-600 group-hover:translate-x-1 transition-all duration-200">
+              Let's automate →
             </span>
           </button>
         ))}
