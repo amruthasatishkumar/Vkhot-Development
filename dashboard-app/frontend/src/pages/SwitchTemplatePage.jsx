@@ -299,17 +299,14 @@ function PortProfilesTab({ templateId }) {
   const [loadingNets, setLoadingNets] = useState(false);
   const [netError,    setNetError]    = useState('');
 
-  const [count,       setCount]       = useState('');
-  const [countErr,    setCountErr]    = useState('');
-  const [mode,        setMode]        = useState('access');
-  const [portNetwork, setPortNetwork] = useState('');
-  const [voipNetwork, setVoipNetwork] = useState('');
-  const [selectErr,   setSelectErr]   = useState('');
+  const [count,     setCount]     = useState('');
+  const [countErr,  setCountErr]  = useState('');
+  const [mode,      setMode]      = useState('access');
 
-  const [generated,   setGenerated]   = useState([]);
-  const [creating,    setCreating]    = useState(false);
-  const [success,     setSuccess]     = useState(null);
-  const [apiError,    setApiError]    = useState('');
+  const [generated, setGenerated] = useState([]);
+  const [creating,  setCreating]  = useState(false);
+  const [success,   setSuccess]   = useState(null);
+  const [apiError,  setApiError]  = useState('');
 
   useEffect(() => {
     async function load() {
@@ -328,26 +325,40 @@ function PortProfilesTab({ templateId }) {
     load();
   }, [templateId]);
 
+  // For each profile, randomly pick two distinct networks from the available pool.
   function generateProfiles(n) {
-    const usedIds = new Set();
-    const list    = [];
+    const usedProfileIds = new Set();
+    const list           = [];
+    // Shuffle a copy of networks so we spread usage across the whole pool.
+    const shuffled = [...networks].sort(() => Math.random() - 0.5);
+
     for (let i = 0; i < n; i++) {
-      let id;
-      do { id = Math.floor(Math.random() * 900) + 100; } // 100–999
-      while (usedIds.has(id));
-      usedIds.add(id);
-      list.push({ name: `PROFILE_${id}`, mode, port_network: portNetwork, voip_network: voipNetwork });
+      // Pick port_network and voip_network as two different networks from the pool.
+      // Rotate through the shuffled list so all networks get used.
+      const portIdx = (i * 2)     % shuffled.length;
+      let   voipIdx = (i * 2 + 1) % shuffled.length;
+      // If they land on the same index (only possible when pool size === 1, guarded below), shift.
+      if (voipIdx === portIdx) voipIdx = (voipIdx + 1) % shuffled.length;
+
+      let profileId;
+      do { profileId = Math.floor(Math.random() * 900) + 100; } // 100–999
+      while (usedProfileIds.has(profileId));
+      usedProfileIds.add(profileId);
+
+      list.push({
+        name:         `PROFILE_${profileId}`,
+        mode,
+        port_network: shuffled[portIdx].name,
+        voip_network: shuffled[voipIdx].name,
+      });
     }
     return list;
   }
 
   function handleGenerate() {
-    setCountErr(''); setSelectErr(''); setSuccess(null); setApiError('');
+    setCountErr(''); setSuccess(null); setApiError('');
     const n = parseInt(count, 10);
     if (!count || isNaN(n) || n < 1) { setCountErr('Enter a number greater than 0.'); return; }
-    if (!portNetwork)                 { setSelectErr('Select a Port Network (untagged/native VLAN).'); return; }
-    if (!voipNetwork)                 { setSelectErr('Select a VoIP Network.'); return; }
-    if (portNetwork === voipNetwork)  { setSelectErr('Port Network and VoIP Network must be different.'); return; }
     setGenerated(generateProfiles(n));
   }
 
@@ -393,17 +404,24 @@ function PortProfilesTab({ templateId }) {
 
   return (
     <div className="space-y-5">
-      {/* Config grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+      {/* Info pill */}
+      <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-700 px-3 py-1.5 text-xs text-teal-700 dark:text-teal-300">
+        <span>🎲</span>
+        <span>{networks.length} network{networks.length > 1 ? 's' : ''} available — port &amp; VoIP networks are assigned randomly per profile</span>
+      </div>
+
+      {/* Controls row */}
+      <div className="flex flex-wrap items-end gap-4">
 
         {/* Mode */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mode</label>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {['access', 'trunk'].map((m) => (
               <button key={m} type="button"
                 onClick={() => { setMode(m); setGenerated([]); setSuccess(null); }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors capitalize ${
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors capitalize ${
                   mode === m
                     ? 'bg-teal-600 border-teal-600 text-white'
                     : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-teal-400 dark:hover:border-teal-500 bg-white dark:bg-gray-700'
@@ -417,49 +435,17 @@ function PortProfilesTab({ templateId }) {
         {/* Count */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            How many profiles to create?
+            How many profiles?
           </label>
           <input type="number" min={1} value={count}
             onChange={(e) => { setCount(e.target.value); setCountErr(''); setGenerated([]); setSuccess(null); }}
             placeholder="e.g. 10"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-36 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           {countErr && <p className="mt-1 text-xs text-red-500">{countErr}</p>}
         </div>
 
-        {/* Port Network */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Port Network <span className="text-gray-400 font-normal">(Untagged / Native VLAN)</span>
-          </label>
-          <select value={portNetwork}
-            onChange={(e) => { setPortNetwork(e.target.value); setSelectErr(''); setGenerated([]); setSuccess(null); }}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-            <option value="">Select network…</option>
-            {networks.filter((n) => n.name !== voipNetwork).map((n) => (
-              <option key={n.name} value={n.name}>{n.name} (VLAN {n.vlan_id})</option>
-            ))}
-          </select>
-        </div>
-
-        {/* VoIP Network */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            VoIP Network
-          </label>
-          <select value={voipNetwork}
-            onChange={(e) => { setVoipNetwork(e.target.value); setSelectErr(''); setGenerated([]); setSuccess(null); }}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-            <option value="">Select network…</option>
-            {networks.filter((n) => n.name !== portNetwork).map((n) => (
-              <option key={n.name} value={n.name}>{n.name} (VLAN {n.vlan_id})</option>
-            ))}
-          </select>
-        </div>
-
       </div>
-
-      {selectErr && <p className="text-xs text-red-500">{selectErr}</p>}
 
       <button type="button" onClick={handleGenerate}
         className="rounded-lg bg-gray-800 dark:bg-gray-600 hover:bg-gray-700 dark:hover:bg-gray-500 text-white text-sm font-medium px-4 py-2 transition-colors">
