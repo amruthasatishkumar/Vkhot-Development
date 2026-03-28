@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const NETWORKS_BACK_ITEMS = [
-  'Bulk Networks',
+  'Networks',
   'Port Profiles',
   'Port Profile Assignment',
 ];
@@ -65,7 +65,7 @@ function FlipCard({ title, backItems, onClick }) {
           }}
         >
           <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: '0.75rem' }}>
-            Here you can create:
+            Here you can create Bulk
           </p>
           <ul style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {backItems.map((item) => (
