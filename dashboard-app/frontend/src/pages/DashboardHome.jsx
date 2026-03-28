@@ -54,7 +54,7 @@ function FlipCard({ title, backHeader, backItems, onClick }) {
         <div
           style={{ ...faceBase, background: 'linear-gradient(to top right, #e8c97a, #fdf6e3)', border: '1px solid #d4a843' }}
         >
-          <p style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
+          <p style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827', lineHeight: 1.3 }}>
             {title}
           </p>
           <span style={{ marginTop: 'auto', fontSize: '0.82rem', fontWeight: 500, color: '#9ca3af' }}>
