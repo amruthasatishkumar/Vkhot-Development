@@ -166,8 +166,13 @@ router.post('/vc-automate', async (req, res) => {
   if (!vc_mac    || typeof vc_mac    !== 'string' || !vc_mac.trim())    return res.status(400).json({ error: 'vc_mac is required.' });
 
   res.setHeader('Content-Type', 'application/x-ndjson');
-  res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  // Flush headers immediately so the browser fetch() resolves right away
+  // and the reader is set up before any emit() calls happen.
+  res.flushHeaders();
+  // Disable Nagle's algorithm so each res.write() arrives immediately.
+  if (res.socket) res.socket.setNoDelay(true);
 
   // Track client disconnect so backend waits can be interrupted immediately
   let cancelled = false;

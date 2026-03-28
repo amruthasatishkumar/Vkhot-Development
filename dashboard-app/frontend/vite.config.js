@@ -10,6 +10,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3003',
         changeOrigin: true,
+        // Disable proxy timeout so long-running NDJSON streams (5-min waits)
+        // are not silently killed by the Vite dev proxy.
+        proxyTimeout: 0,
+        timeout: 0,
       },
     },
   },
