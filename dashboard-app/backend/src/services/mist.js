@@ -494,18 +494,21 @@ async function renumberVC(siteId, deviceId) {
     throw new Error('Cannot renumber: virtual_chassis.members not found or fewer than 2 members');
   }
 
-  const hasFpc0 = currentMembers.some((m) => m.member_id === 0);
-  const hasFpc1 = currentMembers.some((m) => m.member_id === 1);
-  if (!hasFpc0 || !hasFpc1) {
+  const fpc0 = currentMembers.find((m) => m.member_id === 0);
+  const fpc1 = currentMembers.find((m) => m.member_id === 1);
+  if (!fpc0 || !fpc1) {
     throw new Error('Cannot renumber: member_id 0 or 1 not found in virtual_chassis.members');
   }
 
-  // Swap member_ids 0 ↔ 1; everything else (mac, vc_role, higher member_ids) stays the same
-  const swappedMembers = currentMembers.map((m) => ({
-    mac:       normaliseMac(m.mac),
-    vc_role:   m.vc_role,
-    member_id: m.member_id === 0 ? 1 : m.member_id === 1 ? 0 : m.member_id,
-  }));
+  // Swap: slot positions (member_id) stay fixed.
+  // The MAC + role that occupies each slot are exchanged —
+  // slot 0 gets fpc1's mac/role, slot 1 gets fpc0's mac/role.
+  // Linecards (member_id >= 2) are untouched.
+  const swappedMembers = currentMembers.map((m) => {
+    if (m.member_id === 0) return { mac: normaliseMac(fpc1.mac), vc_role: fpc1.vc_role, member_id: 0 };
+    if (m.member_id === 1) return { mac: normaliseMac(fpc0.mac), vc_role: fpc0.vc_role, member_id: 1 };
+    return { mac: normaliseMac(m.mac), vc_role: m.vc_role, member_id: m.member_id };
+  });
 
   const body = {
     virtual_chassis: { preprovisioned: true, members: swappedMembers },
